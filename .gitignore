@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+dist/
+build/
+.eggs/
+*.ipynb_checkpoints/
+
+# Model weights (too large for GitHub — distribute via shared drive)
+*.pth
+*.pt
+*.pkl
+*.bin
+*.onnx
+
+# Next.js
+elbow-grader-ui/node_modules/
+elbow-grader-ui/.next/
+elbow-grader-ui/.env.local
+elbow-grader-ui/out/
+
+# Training artifacts (not needed to run the app)
+experiments/
+outputs/
+
+# Archive
+app_streamlit_archive/
+
+# Research / non-app files (not needed to run the web app)
+*.ipynb
+*.pptx
+*.docx
+*.xlsx
+*.xls
+*.csv
+
+# OS
+desktop.ini
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.tmp
