@@ -30,10 +30,10 @@ class PipelineConfig:
     yolo_baumann_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "yolo" / "exp.pt"
 
     # === DRUE OOD filter checkpoints (per experiment) ===
-    drue_exp1_ckpt: Optional[Path] = _EXPERIMENTS / "drue_outputs_exp1" / "drue_decoders.pth"
-    drue_exp2_ckpt: Optional[Path] = _EXPERIMENTS / "drue_outputs_exp2" / "drue_decoders.pth"
-    drue_exp3_ckpt: Optional[Path] = _EXPERIMENTS / "drue_outputs_exp3" / "drue_decoders.pth"
-    drue_exp4_ckpt: Optional[Path] = _EXPERIMENTS / "drue_outputs_exp4" / "drue_decoders.pth"
+    drue_exp1_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "drue_outputs_exp1" / "drue_decoders.pth"
+    drue_exp2_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "drue_outputs_exp2" / "drue_decoders.pth"
+    drue_exp3_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "drue_outputs_exp3" / "drue_decoders.pth"
+    drue_exp4_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "drue_outputs_exp4" / "drue_decoders.pth"
 
     # === DRUE OOD rejection thresholds ===
     # An image is flagged OOD if its DRUE score > the threshold for that

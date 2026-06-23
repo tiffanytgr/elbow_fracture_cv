@@ -39,22 +39,22 @@ Model weights are **not** included in this repository (excluded via `.gitignore`
 
 **[Download all weights (OneDrive)](https://entuedu-my.sharepoint.com/:f:/r/personal/tiff0030_e_ntu_edu_sg/Documents/AI6129/KKH_Elbow/experiments/checkpoints?csf=1&web=1&e=quSoY4)**
 
-After downloading, create an `experiments/` folder in the project root and place files as follows:
+After downloading, place the `checkpoints/` folder inside `experiments/` in the project root:
 
 ```
 experiments/
-├── checkpoints/
-│   ├── exp1/best_model_for_analysis.pth      # AP Normal vs Fractured (ResNet-18)
-│   ├── exp2/best_model_for_analysis.pth      # AP Grade 3 classifier (ResNet-18)
-│   ├── exp3/best_model_for_analysis.pth      # LAT Grade 1 vs 2 (ResNet-18)
-│   ├── exp4/best_model_for_analysis.pth      # LAT Grade 2a vs 2b (ResNet-18)
-│   ├── cap_regressor/best_model.pth          # Capitellum regressor (ResNet-18)
-│   ├── sam2/sam2_hiera_large.pt              # SAM2 segmentation (~2.4 GB)
-│   └── yolo/exp.pt                           # YOLO humerus segmenter
-├── drue_outputs_exp1/drue_decoders.pth       # DRUE OOD filter (Exp 1)
-├── drue_outputs_exp2/drue_decoders.pth       # DRUE OOD filter (Exp 2)
-├── drue_outputs_exp3/drue_decoders.pth       # DRUE OOD filter (Exp 3)
-└── drue_outputs_exp4/drue_decoders.pth       # DRUE OOD filter (Exp 4)
+└── checkpoints/
+    ├── exp1/best_model_for_analysis.pth          # AP Normal vs Fractured (ResNet-18)
+    ├── exp2/best_model_for_analysis.pth          # AP Grade 3 classifier (ResNet-18)
+    ├── exp3/best_model_for_analysis.pth          # LAT Grade 1 vs 2 (ResNet-18)
+    ├── exp4/best_model_for_analysis.pth          # LAT Grade 2a vs 2b (ResNet-18)
+    ├── cap_regressor/best_model.pth              # Capitellum regressor (ResNet-18)
+    ├── sam2/sam2_hiera_large.pt                  # SAM2 segmentation (~2.4 GB)
+    ├── yolo/exp.pt                               # YOLO humerus segmenter
+    ├── drue_outputs_exp1/drue_decoders.pth       # DRUE OOD filter (Exp 1)
+    ├── drue_outputs_exp2/drue_decoders.pth       # DRUE OOD filter (Exp 2)
+    ├── drue_outputs_exp3/drue_decoders.pth       # DRUE OOD filter (Exp 3)
+    └── drue_outputs_exp4/drue_decoders.pth       # DRUE OOD filter (Exp 4)
 ```
 
 > **Note:** The DRUE OOD weights are optional — if absent, OOD scoring is skipped but grading still works.
