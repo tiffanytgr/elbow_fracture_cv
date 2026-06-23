@@ -13,7 +13,6 @@ from typing import Optional
 # Project root resolves relative to this file
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _EXPERIMENTS  = _PROJECT_ROOT / "experiments"
-_CHECKPOINTS  = _PROJECT_ROOT / "checkpoints"
 
 
 @dataclass
@@ -26,9 +25,9 @@ class PipelineConfig:
     exp3_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "exp3" / "best_model_for_analysis.pth"
     exp4_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "exp4" / "best_model_for_analysis.pth"
     cap_regressor_ckpt: Path  = _EXPERIMENTS / "checkpoints" / "cap_regressor" / "best_model.pth"
-    sam2_ckpt: Path           = _CHECKPOINTS / "sam2_hiera_large.pt"
+    sam2_ckpt: Path           = _EXPERIMENTS / "checkpoints" / "sam2" / "sam2_hiera_large.pt"
     sam2_config: str          = "sam2_hiera_l.yaml"
-    yolo_baumann_ckpt: Optional[Path] = _PROJECT_ROOT.parent / "explainability" / "exp.pt"
+    yolo_baumann_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "yolo" / "exp.pt"
 
     # === DRUE OOD filter checkpoints (per experiment) ===
     drue_exp1_ckpt: Optional[Path] = _EXPERIMENTS / "drue_outputs_exp1" / "drue_decoders.pth"

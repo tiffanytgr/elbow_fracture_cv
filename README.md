@@ -29,43 +29,37 @@ KKH_Elbow/
 ├── pipeline/             # Internal ML pipeline (config, inference, alignment, SAM2)
 ├── backend/              # FastAPI server
 ├── elbow-grader-ui/      # Next.js frontend
-├── checkpoints/          # Model weights (sam2_hiera_large.pt)
-├── experiments/          # Training notebooks and evaluation scripts
-└── outputs/              # Experiment results
+├── experiments/          # Model weights (downloaded separately)
+└── pyproject.toml        # Python package config
 ```
 
 ## Model Weights
 
-Model weights are not included in this repository due to file size. Download them before running the app.
+Model weights are **not** included in this repository (excluded via `.gitignore`) due to GitHub's 100 MB file-size limit.
 
-**[Download all weights (Google Drive)](https://drive.google.com/your-link-here)**
+**[Download all weights (OneDrive)](https://entuedu-my.sharepoint.com/:f:/r/personal/tiff0030_e_ntu_edu_sg/Documents/AI6129/KKH_Elbow/experiments?csf=1&web=1&e=A3zW80)**
 
-After downloading, place the files as follows:
-
-```
-checkpoints/
-└── sam2_hiera_large.pt
-
-experiments/
-└── checkpoints/
-    ├── exp1/best_model_for_analysis.pth
-    ├── exp2/best_model_for_analysis.pth
-    ├── exp3/best_model_for_analysis.pth
-    ├── exp4/best_model_for_analysis.pth
-    └── cap_regressor/best_model.pth
-```
-
-DRUE OOD decoder weights (optional — required for OOD scoring):
+After downloading, create an `experiments/` folder in the project root and place files as follows:
 
 ```
 experiments/
-├── drue_outputs_exp1/drue_decoders.pth
-├── drue_outputs_exp2/drue_decoders.pth
-├── drue_outputs_exp3/drue_decoders.pth
-└── drue_outputs_exp4/drue_decoders.pth
+├── checkpoints/
+│   ├── exp1/best_model_for_analysis.pth      # AP Normal vs Fractured (ResNet-18)
+│   ├── exp2/best_model_for_analysis.pth      # AP Grade 3 classifier (ResNet-18)
+│   ├── exp3/best_model_for_analysis.pth      # LAT Grade 1 vs 2 (ResNet-18)
+│   ├── exp4/best_model_for_analysis.pth      # LAT Grade 2a vs 2b (ResNet-18)
+│   ├── cap_regressor/best_model.pth          # Capitellum regressor (ResNet-18)
+│   ├── sam2/sam2_hiera_large.pt              # SAM2 segmentation (~2.4 GB)
+│   └── yolo/exp.pt                           # YOLO humerus segmenter
+├── drue_outputs_exp1/drue_decoders.pth       # DRUE OOD filter (Exp 1)
+├── drue_outputs_exp2/drue_decoders.pth       # DRUE OOD filter (Exp 2)
+├── drue_outputs_exp3/drue_decoders.pth       # DRUE OOD filter (Exp 3)
+└── drue_outputs_exp4/drue_decoders.pth       # DRUE OOD filter (Exp 4)
 ```
 
-`sam2_hiera_large.pt` can also be downloaded directly from the [Meta SAM2 releases page](https://github.com/facebookresearch/sam2/releases).
+> **Note:** The DRUE OOD weights are optional — if absent, OOD scoring is skipped but grading still works.
+
+> `sam2_hiera_large.pt` can also be downloaded directly from the [Meta SAM2 releases page](https://github.com/facebookresearch/sam2/releases).
 
 ## Prerequisites
 

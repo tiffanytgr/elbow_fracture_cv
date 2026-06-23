@@ -65,7 +65,7 @@ class ElbowGrader:
             If None, uses the default paths baked into pipeline/config.py.
         sam2_ckpt : path, optional
             Explicit path to sam2_hiera_large.pt. If None, uses the default
-            from pipeline/config.py (KKH_Elbow/checkpoints/sam2_hiera_large.pt).
+            from pipeline/config.py (experiments/checkpoints/sam2/sam2_hiera_large.pt).
         """
         self._grader_config = config or GraderConfig()
         self._pipeline_cfg = self._build_pipeline_config(checkpoint_dir, sam2_ckpt)
