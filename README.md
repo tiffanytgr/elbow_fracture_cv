@@ -37,7 +37,7 @@ KKH_Elbow/
 
 Model weights are **not** included in this repository (excluded via `.gitignore`) due to GitHub's 100 MB file-size limit.
 
-**[Download all weights (OneDrive)](https://entuedu-my.sharepoint.com/:f:/r/personal/tiff0030_e_ntu_edu_sg/Documents/AI6129/KKH_Elbow/experiments?csf=1&web=1&e=A3zW80)**
+**[Download all weights (OneDrive)](https://entuedu-my.sharepoint.com/:f:/r/personal/tiff0030_e_ntu_edu_sg/Documents/AI6129/KKH_Elbow/experiments/checkpoints?csf=1&web=1&e=quSoY4)**
 
 After downloading, create an `experiments/` folder in the project root and place files as follows:
 
