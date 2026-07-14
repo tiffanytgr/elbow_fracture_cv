@@ -2,7 +2,7 @@
 
 Gartland classification pipeline for paediatric supracondylar elbow fractures. Processes AP and LAT elbow X-rays to assign fracture severity grades (Normal, Grade 1, Grade 2a, Grade 2b, Grade 3) using a combination of deep learning classifiers and geometric analysis.
 
-<img width="500" height="630" alt="image" src="https://github.com/user-attachments/assets/c0637339-3318-4181-9ae2-595e964292d3" />
+<img width="500" height="396" alt="image" src="https://github.com/user-attachments/assets/c0637339-3318-4181-9ae2-595e964292d3" />
 
 
 ## Features
