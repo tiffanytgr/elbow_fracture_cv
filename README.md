@@ -74,24 +74,30 @@ experiments/
 
 ### Backend
 
+From the parent directory:
+
 ```bash
-# Install SAM2 (required for geometric grading) — clone outside KKH_Elbow/
+# Clone the repository
+git clone https://github.com/tiffanytgr/elbow_fracture_cv.git KKH_Elbow
+cd KKH_Elbow
+
+# Install SAM2 (required for geometric grading)
 git clone https://github.com/facebookresearch/sam2.git sam2-source
 cd sam2-source
 pip install -e .
 cd ..
 
 # Copy SAM2 weights into checkpoints
+mkdir -p experiments/checkpoints/sam2
+# Linux/macOS:
 cp sam2-source/checkpoints/sam2_hiera_large.pt experiments/checkpoints/sam2/sam2_hiera_l.pt
+# Windows:
+copy sam2-source\checkpoints\sam2_hiera_large.pt experiments\checkpoints\sam2\sam2_hiera_l.pt
 
 pip install -e .
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload --port 8000
 ```
-```
-
-Backend serves on **http://localhost:8000**.
-
 ### Frontend
 
 From `KKH_Elbow/elbow-grader-ui/`:
