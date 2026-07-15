@@ -52,7 +52,7 @@ experiments/
     ├── exp3/best_model_for_analysis.pth          # LAT Grade 1 vs 2 (ResNet-18)
     ├── exp4/best_model_for_analysis.pth          # LAT Grade 2a vs 2b (ResNet-18)
     ├── cap_regressor/best_model.pth              # Capitellum regressor (ResNet-18)
-    ├── sam2/sam2_hiera_large.pt                  # SAM2 segmentation (~2.4 GB)
+    ├── sam2/sam2_hiera_l.pt                      # SAM2 segmentation (~2.4 GB)
     ├── yolo/exp.pt                               # YOLO humerus segmenter
     ├── drue_outputs_exp1/drue_decoders.pth       # DRUE OOD filter (Exp 1)
     ├── drue_outputs_exp2/drue_decoders.pth       # DRUE OOD filter (Exp 2)
@@ -82,7 +82,7 @@ pip install -e .
 cd ..
 
 # Copy SAM2 weights into checkpoints
-cp sam2-source/checkpoints/sam2_hiera_large.pt experiments/checkpoints/sam2/sam2_hiera_large.pt
+cp sam2-source/checkpoints/sam2_hiera_large.pt experiments/checkpoints/sam2/sam2_hiera_l.pt
 
 pip install -e .
 pip install -r backend/requirements.txt
