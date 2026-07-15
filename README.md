@@ -74,15 +74,12 @@ experiments/
 
 ### Backend
 
-From `KKH_Elbow/`:
-
-# Install SAM2
+```bash
+# Install SAM2 (required for geometric grading) — clone outside KKH_Elbow/
 git clone https://github.com/facebookresearch/sam2.git sam2-source
 cd sam2-source
 pip install -e .
 cd ..
-
-```bash
 
 pip install -e .
 pip install -r backend/requirements.txt
