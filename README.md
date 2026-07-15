@@ -35,6 +35,12 @@ KKH_Elbow/
 ├── experiments/          # Model weights (downloaded separately)
 └── pyproject.toml        # Python package config
 ```
+## Getting Started
+
+```bash
+git clone https://github.com/tiffanytgr/elbow_fracture_cv.git KKH_Elbow
+cd KKH_Elbow
+```
 
 ## Model Weights
 
@@ -42,7 +48,25 @@ Model weights are **not** included in this repository (excluded via `.gitignore`
 
 **[Download all weights (OneDrive)](https://entuedu-my.sharepoint.com/:f:/r/personal/tiff0030_e_ntu_edu_sg/Documents/AI6129/KKH_Elbow/experiments/checkpoints?csf=1&web=1&e=quSoY4)**
 
-After downloading, place the `checkpoints/` folder inside `experiments/` in the project root:
+After downloading, place the `checkpoints/` folder inside `experiments/` in the project root.
+
+**SAM2 weights** are obtained separately from the [SAM2 repository](https://github.com/facebookresearch/sam2):
+
+```bash
+git clone https://github.com/facebookresearch/sam2.git sam2-source
+cd sam2-source
+pip install -e .
+cd ..
+
+# Copy SAM2 weights into checkpoints
+mkdir -p experiments/checkpoints/sam2
+# Linux/macOS:
+cp sam2-source/checkpoints/sam2_hiera_l.pt experiments/checkpoints/sam2/sam2_hiera_l.pt
+# Windows:
+copy sam2-source\checkpoints\sam2_hiera_l.pt experiments\checkpoints\sam2\sam2_hiera_l.pt
+```
+
+After setup, your checkpoints should look like:
 
 ```
 experiments/
@@ -62,8 +86,6 @@ experiments/
 
 > **Note:** The DRUE OOD weights are optional — if absent, OOD scoring is skipped but grading still works.
 
-> `sam2_hiera_large.pt` can also be downloaded directly from the [Meta SAM2 releases page](https://github.com/facebookresearch/sam2/releases).
-
 ## Prerequisites
 
 - Python ≥ 3.10 with CUDA-capable PyTorch
@@ -74,30 +96,13 @@ experiments/
 
 ### Backend
 
-From the parent directory:
-
 ```bash
-# Clone the repository
-git clone https://github.com/tiffanytgr/elbow_fracture_cv.git KKH_Elbow
-cd KKH_Elbow
-
-# Install SAM2 (required for geometric grading)
-git clone https://github.com/facebookresearch/sam2.git sam2-source
-cd sam2-source
-pip install -e .
-cd ..
-
-# Copy SAM2 weights into checkpoints
-mkdir -p experiments/checkpoints/sam2
-# Linux/macOS:
-cp sam2-source/checkpoints/sam2_hiera_large.pt experiments/checkpoints/sam2/sam2_hiera_l.pt
-# Windows:
-copy sam2-source\checkpoints\sam2_hiera_large.pt experiments\checkpoints\sam2\sam2_hiera_l.pt
-
 pip install -e .
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload --port 8000
 ```
+
+Backend serves on **http://localhost:8000**.
 ### Frontend
 
 From `KKH_Elbow/elbow-grader-ui/`:
