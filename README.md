@@ -81,9 +81,13 @@ cd sam2-source
 pip install -e .
 cd ..
 
+# Copy SAM2 weights into checkpoints
+cp sam2-source/checkpoints/sam2_hiera_large.pt experiments/checkpoints/sam2/sam2_hiera_large.pt
+
 pip install -e .
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload --port 8000
+```
 ```
 
 Backend serves on **http://localhost:8000**.
