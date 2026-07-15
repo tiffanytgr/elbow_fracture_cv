@@ -76,7 +76,14 @@ experiments/
 
 From `KKH_Elbow/`:
 
+# Install SAM2
+git clone https://github.com/facebookresearch/sam2.git sam2-source
+cd sam2-source
+pip install -e .
+cd ..
+
 ```bash
+
 pip install -e .
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload --port 8000
