@@ -230,10 +230,18 @@ pathway [enumerate rules]. Discordance definitions, thresholds, the IoU cut-poin
 and missing-measurement handling were prespecified before test-set evaluation. Flagged cases
 were surfaced for review, not silently overridden.
 
-### Out-of-distribution Filtering (Exploratory)
-DRUE per-class reconstruction thresholds were [not calibrated; the gate was inactive in the
-evaluated system / calibrated on a disjoint cohort — state]. Reported as an exploratory safety
-component only.
+### Out-of-distribution Filtering
+A dual reconstruction uncertainty estimation (DRUE) filter was applied per node. Two
+reconstruction decoders (shallow, from ResNet-18 `layer1`; deep, from `layer4`) attached to a
+frozen classifier backbone produced a per-image uncertainty score defined as the mean absolute
+difference between the shallow and deep reconstructions; higher scores indicate greater
+out-of-distribution deviation. The rejection threshold for each node was set at the **95th
+percentile of the in-distribution DRUE score distribution** [state calibration partition —
+training or validation, and confirm it is disjoint from the test set]; images with a score
+above this threshold were flagged as out-of-distribution and removed, retaining the lower 95%
+of in-distribution cases by construction. Full-cohort and OOD-filtered performance are both
+reported; filtered performance does not replace full-cohort performance. Score computation and
+threshold derivation are detailed in Appendix S1.
 
 ### Model Comparison and Ablations
 The framework was compared against [a flat four-class ResNet-18 baseline on the same splits]
@@ -306,6 +314,13 @@ IoU distribution overall and stratified by correct/incorrect classification; dis
 for actual misclassifications, [X]; review burden, [X] cases per [period]; comparison against
 random flagging at equal coverage (Fig [n]).
 
+### Out-of-distribution Filtering
+At the 95th-percentile DRUE threshold, [X]% of test cases were flagged as out-of-distribution
+and removed. Classification performance on the retained (in-distribution) subset was [X] versus
+[X] on the full cohort; both are reported so filtered performance does not stand in for
+full-cohort performance. [Report coverage and selective risk; compare against random rejection
+at equal coverage — see Appendix S2, B.7.]
+
 ### Ablation Results
 Representation-learning ablation (Table [n]): autoencoder [X] vs ImageNet [X] vs random [X].
 Flat multiclass baseline vs cascade: [X]. Preprocessing effects: [X].
@@ -352,8 +367,9 @@ the relationship explicitly.]
 cohort of limited size; YOLO developed on 90 images; segmentation metrics do not guarantee
 angle accuracy; Baumann angle sensitivity to positioning and rotation; physeal-line dependence
 on distal segmentation; reference-measurement observer variability; wide CIs at the IIA/IIB
-node; DRUE thresholds not independently calibrated; no prospective or external workflow
-validation.]
+node; the DRUE out-of-distribution threshold was set at a single in-distribution percentile
+(95th) rather than tuned against a labeled OOD set [and — if applicable — the calibration
+partition's disjointness from the test set]; no prospective or external workflow validation.]
 
 **¶8 — Conclusion.** In conclusion, an anatomically grounded framework integrating autoencoder-
 pretrained hierarchical ResNet-18 classification with automated AP and lateral anatomic
@@ -440,6 +456,11 @@ outputs (Baumann angle, AHL bisection, cortical-width profile).
   adjudication; manual Baumann-angle protocol and inter-reader setup.
 - **A.3.6. Ablation and comparison configurations.** Exact definitions of each ablation arm and
   the flat multiclass baseline.
+- **A.3.7. DRUE out-of-distribution filter.** Decoder architecture (shallow from `layer1`, deep
+  from `layer4`); uncertainty score = mean |shallow_recon − deep_recon| (equation); threshold
+  set at the 95th percentile of the in-distribution DRUE scores on the [calibration partition];
+  confirmation the calibration partition is disjoint from the test set. *(Table S[n]: per-node
+  95th-percentile threshold and resulting coverage.)*
 
 ## Appendix S2. Supplementary Results
 
@@ -454,8 +475,9 @@ outputs (Baumann angle, AHL bisection, cortical-width profile).
   Altman; proportional-bias check; MAE–median gap. *(Fig S6; Table S8.)*
 - **B.6. Segmentation quality.** YOLO and SAM2 Dice/IoU against manual masks by region.
   *(Table S9.)*
-- **B.7. Selective prediction.** Risk–coverage curves for cross-module flagging and DRUE vs
-  random rejection. *(Fig S7.)*
+- **B.7. Selective prediction.** Risk–coverage curves for cross-module flagging and DRUE
+  (95th-percentile threshold) vs random rejection at equal coverage; coverage, selective risk,
+  and errors captured at the operating threshold. *(Fig S7.)*
 - **B.8. Calibration.** Calibration curves, intercept/slope, Brier decomposition. *(Fig S8.)*
 - **B.9. Computational cost.** Params, GPU memory, FLOPs, training/inference time per component
   (as in Han et al. Table S8). *(Table S10.)*
@@ -482,4 +504,6 @@ SAM2 checkpoint, YOLO/Ultralytics version, Otsu, PCA references not cited in the
   tables → Supplement (S1–S10).
 - **Still blocked on executed-code facts:** exact losses (autoencoder, classifiers, YOLO,
   capitellum), PCA proximal-mask fraction, Exp4 threshold criterion, isotropic-scaling status,
-  DRUE calibration state, and all final metrics. Pull these from the pipeline code before filling.
+  and all final metrics. Pull these from the pipeline code before filling. (DRUE OOD filtering
+  was performed with a 95th-percentile in-distribution threshold; the committed pipeline config
+  ships thresholds as `None`, so record the exact per-node threshold values from your analysis.)

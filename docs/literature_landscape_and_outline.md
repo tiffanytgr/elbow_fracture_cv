@@ -180,7 +180,8 @@ grading with surgical-grade recall demonstrated; no claim of clinical readiness.
 - **3.6 Module 3B — lateral measurement** (SAM2; capitellum regressor; AHL; cortical width).
 - **3.7 Module 4 — cross-module verification** (Grad-CAM↔mask IoU; rule discordance;
   prespecified thresholds).
-- **3.8 OOD filtering (DRUE)** — report as exploratory/inactive unless calibrated.
+- **3.8 OOD filtering (DRUE)** — performed; cases above the 95th-percentile in-distribution DRUE
+  score were removed. Report full-cohort and OOD-filtered performance (both, never one for the other).
 - **3.9 Ablations** — representation-learning (random/ImageNet/autoencoder); preprocessing;
   **flat multiclass baseline** (Appendix Tier-2 #6); component ablation.
 - **3.10 Endpoints & statistics** — primary IIB recall; Clopper–Pearson/Wilson CIs; patient-
@@ -191,7 +192,8 @@ grading with surgical-grade recall demonstrated; no claim of clinical readiness.
 ### 4. Results (mirror Methods order)
 Cohort → standardization → **classification: node-conditional AND end-to-end** → YOLO seg →
 **Baumann agreement (separate from mAP)** → lateral pipeline → cross-module consistency →
-ablations → OOD (if any) → failure analysis → downstream management agreement.
+ablations → OOD filtering (95th-percentile DRUE; full-cohort vs filtered) → failure analysis →
+downstream management agreement.
 
 ### 5. Discussion
 Main findings (numeric) → hierarchical contribution → AP measurement contribution → lateral
