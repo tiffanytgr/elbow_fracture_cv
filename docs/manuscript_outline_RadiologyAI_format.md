@@ -58,10 +58,12 @@ included. Grade IIB recall was [X]% (95% CI: [X], [X]); Grade III recall was [X]
 angle showed a mean absolute error of [X]° (ICC, [X]; Bland–Altman bias, [X]°; 95% limits of
 agreement, [X], [X]). [Segmentation Dice, ablation, and consistency-flag results summarized.]
 
-**Conclusion:** An anatomically grounded framework combining hierarchical deep learning with
-automated AP and lateral anatomic measurements produced interpretable Gartland grade
-predictions with [surgical-grade recall / the reported recall] and auditable anatomic
-evidence. Prospective and external validation are required before clinical use.
+**Conclusion:** In this feasibility evaluation, an anatomically grounded framework combining
+hierarchical deep learning with automated AP and lateral anatomic measurements produced
+interpretable Gartland grade predictions with auditable anatomic evidence and flagged
+unreliable predictions for review. Grade IIB recall at the surgical boundary was [X]% (95% CI:
+[X], [X]). The framework is positioned as interpretable decision support rather than autonomous
+grading; prospective and external validation are required before clinical use.
 
 *Supplemental material is available for this article.*
 *© RSNA, 2026*
@@ -79,9 +81,9 @@ Anything Model 2, SCHF = supracondylar humerus fracture, YOLO = you only look on
 
 ### Summary
 An anatomically grounded AI framework integrating hierarchical deep learning with automated
-AP- and lateral-view anatomic measurements produced interpretable Gartland classifications of
-pediatric supracondylar humerus fractures, with the surgically decisive Grade IIB boundary as
-the primary endpoint.
+AP- and lateral-view anatomic measurements provided interpretable decision support for Gartland
+classification of pediatric supracondylar humerus fractures, evaluated at the surgically
+decisive Grade IIB boundary as the primary endpoint.
 
 ### Key Points
 *(Three bullets; every bullet must carry a number in the final manuscript — see exemplars.)*
@@ -201,8 +203,11 @@ subset defined by the reference standard. Two-stage transfer (Stage 1: encoder f
 head trained; Stage 2: encoder unfrozen, fine-tuned with reduced backbone learning rate
 [ratio]) was used. The classification objective was [exact loss as executed — eg, two-logit
 weighted cross-entropy] with class weights [state numerically], held constant across
-regularization arms. Operating thresholds were selected on the validation partition [state
-criterion]. Grad-CAM from `layer4[-1]` was used post hoc for attention assessment and as
+regularization arms. Model checkpoints were selected on the validation partition by positive-
+class (Grade IIB at Exp4) F1; the Exp4 operating threshold was then selected on validation to
+meet a prespecified recall target at the surgical boundary, and the full precision–recall
+operating curve is reported. Grad-CAM from `layer4[-1]` was used post hoc for attention
+assessment and as
 input to §Module 4. Full training schedules and hyperparameters are in Appendix S1.
 
 ### Module 3: View-specific Anatomic Measurement
@@ -251,8 +256,16 @@ module contribution (classifier alone; + AP Baumann; + lateral module; full fram
 verification). Detailed ablation configurations are in Appendix S1.
 
 ### Evaluation Metrics
-The primary endpoint was Grade IIB recall (sensitivity). Secondary endpoints included Grade III
-recall; per-node and end-to-end cascade performance; weighted κ (with prevalence/bias indices
+The primary endpoint was Grade IIB recall (sensitivity), chosen because the misclassification
+costs at the surgical boundary are asymmetric (a missed IIB is a surgical fracture managed in a
+cast; a false-positive IIB is a theatre referral resolved by review), so the headline metric is
+one-sided. Positive-class (Grade IIB) F1 was the validation model-selection criterion and is
+reported as a secondary metric for comparability with prior literature; because it was computed
+on the surgical positive class, it is aligned with — not opposed to — the recall objective.
+Overall accuracy and weighted F1 are not used as primary endpoints (prevalence-dependent and
+symmetric in the two error types, contradicting the clinical cost asymmetry). Secondary
+endpoints included Grade III recall; per-node and end-to-end cascade performance; weighted κ
+(with prevalence/bias indices
 or PABAK); AUROC and AUPRC at Exp2 and Exp4 (with no-skill baselines); the Exp4 precision–
 recall operating curve; calibration (intercept, slope, Brier); and, for measurement modules,
 mean and median absolute error, ICC(2,1, absolute agreement), Bland–Altman bias and limits of
@@ -340,8 +353,11 @@ Predicted management (immobilization vs reduction+CRPP) versus recorded manageme
 paragraph then "In conclusion.")*
 
 **¶1 — Principal findings (numeric).** We developed an anatomically grounded framework that
-[recap: IIB recall X%, Grade III recall X%, IIA/IIB κ = X vs expert–expert κ = X, Baumann MAE
-X°]. [One-sentence significance.]
+[recap: IIB recall X% (95% CI wide, given the small IIB denominator), Grade III recall X%,
+IIA/IIB κ = X vs expert–expert κ = X, Baumann MAE X°]. We report these as a feasibility result:
+the confidence interval on the primary endpoint is wide by design at this cohort size, and the
+contribution is an interpretable, auditable framework rather than a high-accuracy autonomous
+grader.
 
 **¶2 — Hierarchical contribution.** The cascade mirrors the clinical decision pathway; [node-
 conditional vs end-to-end interpretation; comparison with a flat multiclass baseline].
@@ -373,8 +389,10 @@ partition's disjointness from the test set]; no prospective or external workflow
 
 **¶8 — Conclusion.** In conclusion, an anatomically grounded framework integrating autoencoder-
 pretrained hierarchical ResNet-18 classification with automated AP and lateral anatomic
-measurements produced interpretable Gartland grade predictions with auditable anatomic
-evidence. Prospective and external validation are required before clinical use.
+measurements produced interpretable Gartland grade predictions with auditable anatomic evidence
+and surfaced unreliable predictions for review. The framework is intended as interpretable
+decision support at the surgical decision boundaries, not as an autonomous grader; prospective
+and external validation are required before clinical use.
 
 ---
 

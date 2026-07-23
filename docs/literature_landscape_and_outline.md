@@ -145,8 +145,9 @@ grading + anatomic grounding).
 
 ### 1. Abstract (structured: Purpose / Materials & Methods / Results / Conclusion)
 Lead the Results with the **primary endpoint (IIB recall, with 95% CI)** and the
-**expert–expert κ ceiling**, then the Baumann-angle agreement. Conclusion: interpretable
-grading with surgical-grade recall demonstrated; no claim of clinical readiness.
+**expert–expert κ ceiling**, then the Baumann-angle agreement. Conclusion: a feasibility
+demonstration of interpretable Gartland grading as decision support, with the wide IIB-recall
+CI stated plainly; no claim of surgical-grade accuracy or clinical readiness.
 
 ### 2. Introduction (six paragraphs, now anchored to real citations)
 1. **Clinical burden** — SCHF incidence, age, operative importance.
