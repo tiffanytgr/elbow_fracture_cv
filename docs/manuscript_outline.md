@@ -308,9 +308,19 @@ segmentation and alignment failures — Fig 5, Fig 6.] [Predicted vs recorded ma
 
 ## PART F — Discussion
 
-**¶1 Principal findings.** In this feasibility evaluation, node-conditional recall was 96% (fracture),
-49% (Grade III), 82% (Grade II), and 33–60% (Grade IIB, depending on selection), with a wide IIB CI.
-The contribution is an interpretable, auditable framework — not a high-accuracy autonomous grader.
+**¶1 Principal findings.** In this feasibility evaluation, the framework classified all four Gartland
+decision nodes, with node-conditional recall of 96% (fracture detection), 49% (Grade III), 82%
+(Grade II), and 33–60% (Grade IIB, depending on model selection); the Grade IIB confidence interval
+was wide given the small surgical subset. The impact of the framework was clearest in grade
+separation: the anatomic-standardization and out-of-distribution quality-control steps raised
+weighted F1 from 0.82 to 0.88 for Grade III versus I+II, 0.74 to 0.82 for Grade I versus II, and 0.72
+to 0.76 for Grade IIA versus IIB, with external-dataset retraining adding further gains to 0.89,
+0.85, and 0.78, respectively (fracture detection, 0.88). These improvements were driven by the
+anatomic-standardization and filtering pipeline rather than the classifier alone, indicating that
+the framework's preprocessing and quality-control design — not model capacity — accounted for the
+gains in grade classification. Weighted F1 is reported for comparability only; recall at the
+surgical boundary remains the limiting metric, and the contribution is an interpretable, auditable
+framework rather than a high-accuracy autonomous grader.
 
 **¶2 Hierarchical contribution.** The cascade mirrors the clinical pathway and produces a full
 ordinal grade, where prior work is binary; report node-conditional and end-to-end results, and the
