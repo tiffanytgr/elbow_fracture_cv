@@ -203,11 +203,15 @@ subset defined by the reference standard. Two-stage transfer (Stage 1: encoder f
 head trained; Stage 2: encoder unfrozen, fine-tuned with reduced backbone learning rate
 [ratio]) was used. The classification objective was [exact loss as executed — eg, two-logit
 weighted cross-entropy] with class weights [state numerically], held constant across
-regularization arms. Model checkpoints were selected on the validation partition by positive-
-class (Grade IIB at Exp4) F1; the Exp4 operating threshold was then selected on validation to
-meet a prespecified recall target at the surgical boundary, and the full precision–recall
-operating curve is reported. Grad-CAM from `layer4[-1]` was used post hoc for attention
-assessment and as
+regularization arms. Within each run, the epoch checkpoint was selected by validation accuracy.
+The per-node operating configuration is selected on the **validation** partition using a
+recall-oriented criterion (positive-class recall or positive-class F1 at the surgical boundary);
+the Exp4 operating threshold is then selected on validation to meet a prespecified recall target,
+with the full precision–recall operating curve reported. ⚠ Implementation note (fix before
+submission): the development ablation selected the final per-node configuration by *test*
+accuracy and reported *weighted* F1 — both must be re-based on the validation partition with
+positive-class metrics, because test-based selection biases the reported performance. Grad-CAM
+from `layer4[-1]` was used post hoc for attention assessment and as
 input to §Module 4. Full training schedules and hyperparameters are in Appendix S1.
 
 ### Module 3: View-specific Anatomic Measurement
@@ -259,11 +263,12 @@ verification). Detailed ablation configurations are in Appendix S1.
 The primary endpoint was Grade IIB recall (sensitivity), chosen because the misclassification
 costs at the surgical boundary are asymmetric (a missed IIB is a surgical fracture managed in a
 cast; a false-positive IIB is a theatre referral resolved by review), so the headline metric is
-one-sided. Positive-class (Grade IIB) F1 was the validation model-selection criterion and is
-reported as a secondary metric for comparability with prior literature; because it was computed
-on the surgical positive class, it is aligned with — not opposed to — the recall objective.
-Overall accuracy and weighted F1 are not used as primary endpoints (prevalence-dependent and
-symmetric in the two error types, contradicting the clinical cost asymmetry). Secondary
+one-sided. Positive-class (Grade IIB) F1 is reported as a secondary metric for comparability;
+weighted F1 (the metric used in the development ablation) is reported for comparability only and
+is not a primary endpoint, as it is symmetric in the two error types and prevalence-dependent,
+contradicting the clinical cost asymmetry. Overall accuracy is likewise not used as a primary
+endpoint. ⚠ Model selection must be performed on the validation partition using positive-class
+recall/F1 rather than test accuracy (see Supervised training). Secondary
 endpoints included Grade III recall; per-node and end-to-end cascade performance; weighted κ
 (with prevalence/bias indices
 or PABAK); AUROC and AUPRC at Exp2 and Exp4 (with no-skill baselines); the Exp4 precision–
@@ -525,3 +530,13 @@ SAM2 checkpoint, YOLO/Ultralytics version, Otsu, PCA references not cited in the
   and all final metrics. Pull these from the pipeline code before filling. (DRUE OOD filtering
   was performed with a 95th-percentile in-distribution threshold; the committed pipeline config
   ships thresholds as `None`, so record the exact per-node threshold values from your analysis.)
+- **Pre-submission methodology fixes (from the training notebooks):**
+  (1) the ablation reported *weighted* F1 (`average='weighted'`) — re-report positive-class
+  recall (primary) and positive-class F1;
+  (2) the final per-node model was selected by *test* accuracy (`test_acc.idxmax()`) — re-select
+  on the validation partition by a recall-oriented criterion (this is test-set leakage as run);
+  (3) per-case probabilities are not saved (eval uses `argmax`) — export `case_id, node,
+  true_label, prob_positive` for val and test to enable PR/AUROC/AUPRC, calibration,
+  recall-target thresholds, and the end-to-end cascade;
+  (4) confirm the train/val/test split (read from upstream `LAT_*` / AP CSVs) is patient-level
+  with no patient spanning partitions — not verifiable from the notebooks alone.
