@@ -21,20 +21,28 @@ check. That triad is this paper's contribution; the individual components are al
 | Prior work | Task | Data | Result | Relation to this study |
 |---|---|---|---|---|
 | Tan MB et al., *Singapore Med J* 2025 (PMID 40258236) ⚠ | Lateral: normal vs abnormal | 1,314 radiographs | Acc 80.4%, AUROC 0.872 | Institutional comparator; **detection only** |
-| DL meta-analysis, PMID 39976732 ⚠ | Detection (synthesis) | multiple | — | Confirms field = detection, not grading |
+| DL meta-analysis, PMID 39976732 | Detection (meta-analysis) | 6 of 22 studies pooled | Pooled sens 0.93 (0.91–0.96), spec 0.89 (0.85–0.92), AUC 0.95 (0.93–0.97) | Field = high-performing **detection**, not grading; recommends ResNet backbone + expert-supervised preprocessing (endorses this design) |
 | Radiomics SCHF, *Medicine* 2024 (PMID 38847664) ⚠ | Fracture vs normal | 411+190 ROIs | AUC 0.65–0.72 | Needs **manual ROIs**; weak; still binary |
-| **AI triage, *Injury* 2026 (S0020138326001440) ⚠** | **Operative (IIB/III/flexion) vs non-operative** | **1,811 AP+lat, single centre 2010–2017** | **Acc 77%, AUROC 0.84, sens 69%** | **Closest prior art — same boundary; black-box binary, no measurement** |
+| **Mishra et al., *Injury* 2026 (S0020138326001440) — KKH, this study's own institution/group** | **Operative (IIB/III/flexion) vs non-operative (Wilkins)** | **1,811 cases / 3,622 radiographs, KKH 2010–2017; 80/20 split, test = 215 cases** | **Acc 77% (71–82), AUROC 0.84 (0.78–0.89), sens 69% (58–78), spec 82% (74–88), κ vs surgeon 0.51 (0.39–0.63)** | **Closest prior art AND the same group's prior work; binary — the authors explicitly call binary a first-stage limitation** |
 | Hierarchical femur cascade, *Eur J Radiol* 2020 ⚠ | AO/OTA cascade | — | — | Cascade precedent (not elbow) |
 | SAM-family zero-shot bone, arXiv:2411.08629 ⚠ | Bone segmentation | CT/MRI | — | SAM2 precedent; unvalidated on pediatric elbow x-ray |
 
 **Positioning rules (load-bearing):**
-1. Do **not** claim novelty of operative/non-operative triage — *Injury* 2026 reported it. Claim
+1. Do **not** claim novelty of operative/non-operative triage — Mishra et al. reported it. Claim
    ordinal grading + interpretable anatomic measurement + cross-module consistency.
-2. The *Injury* 2026 model still reached only **69% sensitivity** at this boundary — external
-   evidence that IIB recall is the genuinely hard, unsolved metric (supports the primary-endpoint
-   choice).
-3. Confirm the *Injury* 2026 / Tan 2025 cohorts are not your own group's data; if they are, state
-   the provenance relationship explicitly.
+2. Their model reached only **69% sensitivity** at this boundary — evidence that IIB recall is the
+   genuinely hard, unsolved metric (supports the primary-endpoint choice). Their model–surgeon
+   agreement (κ = 0.51) is a ready benchmark for your model–expert κ.
+3. **CONFIRMED: Mishra et al. (*Injury* 2026) is from KKH — this study's own institution and group**
+   (authors include Chou, Wong, Lim, Zainuddin). Consequences: (a) cite it as the group's prior work
+   and frame this study as the ordinal-grading + anatomic-measurement extension that directly answers
+   the binary first-stage limitation they acknowledge; (b) **address cohort overlap explicitly** —
+   both draw on KKH SCHF radiographs (theirs 2010–2017, n = 1,811; this study, n = 682) — state the
+   relationship and confirm this study's test set is not contaminated by their training data or vice
+   versa (a reviewer at *Injury*/orthopaedics may well be an author). This is a data-provenance issue,
+   not just a citation.
+4. The DL meta-analysis (sens 0.93) endorses your ResNet backbone + expert-supervised preprocessing
+   choices — cite it as design support, and note detection is solved so the open problem is grading.
 
 ---
 
@@ -127,11 +135,14 @@ agreement is substantial (κ ≈ 0.77–0.85) but degrades at the type II sub-gr
 as low as [0.26–0.43] for IIB — the distinction that determines surgery. Manual Baumann-angle
 measurement itself carries observer variability (inter-reader ICC ≈ 0.74–0.77).
 
-**¶4 What AI has and has not done.** Prior deep learning detects fractures or triages normal
-versus abnormal (Tan 2025; meta-analysis PMID 39976732), and one study reported binary operative-
-versus-nonoperative triage (*Injury* 2026); radiomics grading needs manual ROIs and is weak (AUC
+**¶4 What AI has and has not done.** Deep learning detects pediatric elbow fractures with high
+accuracy (pooled sensitivity 0.93; meta-analysis, PMID 39976732) and triages normal versus
+abnormal (Tan 2025). Our group previously developed a binary operative-versus-nonoperative triage
+model for SCHF (Mishra et al. 2026), which the authors identified as a first-stage approach
+limited by its binary output. Radiomics grading needs manual region delineation and is weak (AUC
 0.65–0.72). No verified system produces a full ordinal Gartland grade together with automated AP-
-and lateral-view anatomic measurements and a learned-versus-anatomic consistency check.
+and lateral-view anatomic measurements and a learned-versus-anatomic consistency check; this study
+extends the group's prior binary triage to that setting.
 
 **¶5 Technical rationale.** A single CNN can exploit markers or positioning shortcuts; the
 framework therefore combines standardized input, radiograph-domain representation learning,
@@ -400,9 +411,13 @@ complementary evidence at the Grade I/II and IIA/IIB boundaries.
 review trigger; surfacing discordance rather than resolving it silently is the design principle.
 Address the Grad-CAM reliability critique directly and cite it.
 
-**¶6 Relation to prior work.** Prior systems detect fractures (Tan 2025) or triage operatively
-(*Injury* 2026); this framework adds an ordinal grade, anatomic measurement, and a consistency
-check. [State cohort-provenance relationship if applicable.]
+**¶6 Relation to prior work.** Prior systems detect fractures (Tan 2025; meta-analysis PMID
+39976732) or, in our group's earlier work, triage operatively versus nonoperatively as a binary
+first stage (Mishra et al. 2026; model–surgeon κ = 0.51). This framework extends that line to a
+full ordinal Gartland grade with automated anatomic measurement and a learned-versus-anatomic
+consistency check, directly addressing the binary limitation the earlier study acknowledged. Both
+studies draw on KKH radiographs; [state the cohort relationship explicitly and confirm no
+train/test contamination between the two studies].
 
 **¶7 Limitations.** Single-institution retrospective cohort of limited size; YOLO developed on 90
 images; segmentation metrics do not guarantee angle accuracy; Baumann angle sensitivity to
@@ -500,6 +515,11 @@ registration/timeline exists by submission (do not report as performed).
     and keep a clean KKH-only held-out test set.*
 16. Describe Pedia as **minority-class augmentation used in training, not external validation** (no
     Normal/Grade 1 on AP).
+17. **Cohort overlap with Mishra et al. (*Injury* 2026, KKH 2010–2017, n=1,811)** — the same group's
+    prior binary-triage study draws on KKH SCHF radiographs. Determine and state whether this study's
+    cases overlap theirs, and confirm no contamination between their training set and this study's test
+    set (or vice versa). Cite as prior work; frame this study as the ordinal-grading extension. This is
+    the single most important data-provenance item.
 
 ---
 
@@ -509,8 +529,11 @@ registration/timeline exists by submission (do not report as performed).
 2. ⚠ Gartland concordance among PEM/radiology/orthopedics. *Pediatr Radiol* 2024. DOI 10.1007/s00247-024-05935-3 / PMID 38693251.
 3. ⚠ Modified Gartland reliability (PMID 11176349; PMC10779671, incl. Baumann/AHL).
 4. ⚠ Tan MB et al. Paediatric elbow radiograph binomial classification. *Singapore Med J* 2025;66(4):208–214. PMID 40258236.
-5. ⚠ DL pediatric elbow fracture detection — systematic review/meta-analysis. PMID 39976732.
-6. ⚠ AI-assisted triage of pediatric SCHF (operative vs non-operative). *Injury* 2026. S0020138326001440.
+5. DL pediatric elbow fracture detection — systematic review/meta-analysis (22 studies, 6 pooled:
+   sens 0.93 [0.91–0.96], spec 0.89 [0.85–0.92], AUC 0.95 [0.93–0.97]). PMID 39976732. ⚠ verify authors/journal.
+6. Mishra N, Lee NKL, Chou ACC, Wong KPL, Lim KBL, Bin Zainuddin MA. Artificial intelligence–assisted
+   triage of pediatric supracondylar humerus fractures in emergency departments: a single-centre
+   validation study. *Injury* 2026. S0020138326001440. **(KKH — same group; prior work.)**
 7. ⚠ Radiomics SCHF diagnosis. *Medicine (Baltimore)* 2024;103(23). PMID 38847664 / PMC11155539.
 8. ⚠ Rayan JC et al. Multiview pediatric elbow classification. *Radiol Artif Intell* 2019. DOI 10.1148/ryai.2019180015.
 9. ⚠ Hierarchical proximal-femur cascade. *Eur J Radiol* 2020. S0720048X20305635.
