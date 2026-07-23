@@ -151,17 +151,19 @@ surgically decisive Grade IIB boundary as the primary endpoint.
 Retrospective study approved by [IRB], protocol [no.], [consent waived/obtained]. Consecutive
 patients [date range] from [institution, KKH] with paired AP and lateral elbow radiographs were
 included. Inclusion: [age threshold; paired views]. Exclusion: [poor quality, cast/splint
-obscuring anatomy, prior fixation]. The internal (KKH) cohort comprised 680 AP and 682 lateral
-radiographs across six categories (Normal, Grade 1, Grade 2a, Grade 2b, Grade 3, and flexion
-type; Table 1); [state the corresponding number of unique patients — the counts here are per
-image, and patient-level totals are required to substantiate patient-level splitting]. Inclusion
-is shown in Figure 2. A supplementary external set (Pedia) of 150 AP and 184 lateral radiographs
-was used to enrich under-represented surgical grades during retraining; it is composed almost
-entirely of Grade 3 (all 150 AP) and, on lateral views, Grade 3, Grade 2b, and Grade 2a (Table
-1). Because Pedia was used for retraining it does not constitute external validation, and its
-grade-skewed composition is stated as a design choice. [Confirm whether Pedia cases entered the
-test partition; if so, the affected class denominators changed — see Results and Part G.]
-Handling of flexion-type fractures within the cascade [merged with the operative/Grade III
+obscuring anatomy, prior fixation]. The internal (KKH) cohort comprised 682 patients,
+each contributing a lateral radiograph and, in 680, a paired AP radiograph, across six categories
+(Normal, Grade 1, Grade 2a, Grade 2b, Grade 3, and flexion type; Table 1). Inclusion is shown in
+Figure 2. A supplementary set (Pedia) of 184 patients (lateral radiographs; AP available in 150)
+was pooled with the internal data and used to enrich under-represented surgical grades; it is
+composed almost entirely of Grade 3 (all AP) and, on lateral views, Grade 3, Grade 2b, and Grade
+2a (Table 1). Pedia was included in training and therefore does not constitute external
+validation. Because Pedia also contributed to the test partition, the pooled test distribution is
+enriched for surgical grades relative to the KKH clinical population; to keep the primary analysis
+interpretable, metrics are reported on the **KKH-only test partition** as the primary analysis and
+on the pooled KKH+Pedia test partition as a secondary analysis. Some patients lacked an AP view;
+the AP nodes (Exp1, Exp2) and the end-to-end cascade therefore [state the missing-AP handling
+rule]. Handling of flexion-type fractures within the cascade [merged with the operative/Grade III
 pathway / excluded — state] is defined in Appendix S1. Acquisition and preprocessing detail is in
 Appendix S1.
 
@@ -267,9 +269,9 @@ Figure 2 outlines selection: [n patients / n images] analyzed, split at the pati
 training (n=[n]), validation (n=[n]), and test (n=[n]). Baseline characteristics are in Table 1;
 reference-standard interobserver agreement was κ = [X].
 
-**Table 1 — Dataset composition (radiographs by class and view).** *Internal cohort = KKH;
-supplementary external set = Pedia. Counts are per image; corresponding patient counts to be
-added.*
+**Table 1 — Dataset composition (radiographs by class and view).** *Internal cohort = KKH (682
+patients; 680 with a paired AP view). Supplementary set = Pedia (184 patients; 150 with AP),
+pooled into training and test. Each patient contributed one radiograph per available view.*
 
 | Class | KKH AP | KKH LAT | Pedia AP | Pedia LAT |
 |---|---:|---:|---:|---:|
@@ -286,8 +288,9 @@ primary node — is the smallest fracture category (63 AP, 71 lateral in KKH), w
 the small Exp4 denominator and the wide confidence interval on the primary endpoint. The
 supplementary Pedia set is concentrated in the surgical grades (Grade 3 and, on lateral views,
 Grade 2b), roughly doubling the lateral Grade 2b count available for training; its addition
-therefore changes the class balance and, if applied to the test partition, the Exp4/Exp2
-denominators (see Effect of Pipeline Quality Control, and Part G).
+therefore changed the class balance and, because Pedia also entered the test partition, the
+Exp2/Exp4 test denominators — so the KKH-only test partition is the primary analysis (see Effect
+of Pipeline Quality Control, and Part G).
 
 **Cascade node composition (KKH reference standard, per view used).**
 
@@ -391,7 +394,11 @@ check. [State cohort-provenance relationship if applicable.]
 images; segmentation metrics do not guarantee angle accuracy; Baumann angle sensitivity to
 positioning; physeal-line dependence on distal segmentation; reference-measurement observer
 variability; wide CIs at the IIA/IIB node; the DRUE threshold is a single in-distribution
-percentile; no prospective or external workflow validation.
+percentile; and no prospective or external workflow validation has been performed. A prospective
+**silent-mode (shadow) trial** — in which the framework runs alongside routine interpretation with
+predictions logged but not surfaced to the treating team, so no patient care is affected — is
+intended as the next validation step [PLACEHOLDER: not yet initiated; add protocol/registration/
+timeline once available, or omit if not started by submission].
 
 **¶8 Conclusion.** In conclusion, an anatomically grounded framework integrating autoencoder-
 pretrained hierarchical ResNet-18 classification with automated AP and lateral anatomic measurements
@@ -461,17 +468,22 @@ proximal-mask fraction, Exp4 threshold value, per-node DRUE 95th-percentile thre
 scaling confirmation, software/library versions.
 
 **Design / governance:** IRB number + consent; reference-standard reader count (drop κ endpoints if
-single-reader); target-journal prior-submission (coursework) policy.
+single-reader); target-journal prior-submission (coursework) policy; **prospective silent-mode
+(shadow) trial** — placeholder in Discussion ¶7, keep as stated future work unless a protocol/
+registration/timeline exists by submission (do not report as performed).
 
 **Dataset (from the overall-dataset table):**
-13. Report **patient counts**, not only image counts (680 AP / 682 LAT images may be ~200 patients
-    with multiple images each) — the patient-level split claim depends on this.
+13. Patient counts confirmed: 682 KKH (680 with AP) + 184 Pedia (150 with AP). State the **missing-AP
+    handling rule** for the AP nodes (Exp1/Exp2) and the end-to-end cascade, since not all patients are paired.
 14. State **flexion-type routing** (7 AP / 12 LAT KKH; 2 LAT Pedia): merged into the operative/Grade 3
     pathway, handled as a separate node, or excluded — it is absent from the four-node cascade as drawn.
-15. Confirm whether **Pedia entered the test partition**; Pedia is Grade-3/2b-skewed, so if it did, the
-    Exp2/Exp4 test denominators changed and the +External column is not like-for-like (ties to item 5).
-16. Describe Pedia as **targeted minority-class augmentation for retraining, not external validation**
-    (it is used in training and contains no Normal/Grade 1 on AP).
+15. Pedia is in **both training and test** and is Grade-3/2b-skewed → the pooled test distribution is
+    enriched for surgical grades. **Report KKH-only test metrics as the primary analysis** (pooled as
+    secondary); re-run every headline number and the +External ablation on the KKH-only test set so
+    comparisons are like-for-like (ties to item 5). *Strongly recommended: use Pedia for training only
+    and keep a clean KKH-only held-out test set.*
+16. Describe Pedia as **minority-class augmentation used in training, not external validation** (no
+    Normal/Grade 1 on AP).
 
 ---
 
