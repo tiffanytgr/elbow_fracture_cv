@@ -36,11 +36,11 @@ check. That triad is this paper's contribution; the individual components are al
 3. **CONFIRMED: Mishra et al. (*Injury* 2026) is from KKH — this study's own institution and group**
    (authors include Chou, Wong, Lim, Zainuddin). Consequences: (a) cite it as the group's prior work
    and frame this study as the ordinal-grading + anatomic-measurement extension that directly answers
-   the binary first-stage limitation they acknowledge; (b) **address cohort overlap explicitly** —
-   both draw on KKH SCHF radiographs (theirs 2010–2017, n = 1,811; this study, n = 682) — state the
-   relationship and confirm this study's test set is not contaminated by their training data or vice
-   versa (a reviewer at *Injury*/orthopaedics may well be an author). This is a data-provenance issue,
-   not just a citation.
+   the binary first-stage limitation they acknowledge; (b) **cohort overlap resolved** — the two
+   studies use **distinct, non-overlapping KKH cohorts** (theirs 2010–2017, n = 1,811; this study,
+   n = 682). State the basis for non-overlap [separate collection/time period — specify] and that no
+   cases are shared; because a reviewer may be an author, make the distinctness explicit rather than
+   implicit.
 4. The DL meta-analysis (sens 0.93) endorses your ResNet backbone + expert-supervised preprocessing
    choices — cite it as design support, and note detection is solved so the open problem is grading.
 
@@ -416,8 +416,8 @@ Address the Grad-CAM reliability critique directly and cite it.
 first stage (Mishra et al. 2026; model–surgeon κ = 0.51). This framework extends that line to a
 full ordinal Gartland grade with automated anatomic measurement and a learned-versus-anatomic
 consistency check, directly addressing the binary limitation the earlier study acknowledged. Both
-studies draw on KKH radiographs; [state the cohort relationship explicitly and confirm no
-train/test contamination between the two studies].
+studies draw on KKH radiographs but use distinct, non-overlapping cohorts [state the basis, e.g.,
+separate collection period], with no shared cases.
 
 **¶7 Limitations.** Single-institution retrospective cohort of limited size; YOLO developed on 90
 images; segmentation metrics do not guarantee angle accuracy; Baumann angle sensitivity to
@@ -515,11 +515,9 @@ registration/timeline exists by submission (do not report as performed).
     and keep a clean KKH-only held-out test set.*
 16. Describe Pedia as **minority-class augmentation used in training, not external validation** (no
     Normal/Grade 1 on AP).
-17. **Cohort overlap with Mishra et al. (*Injury* 2026, KKH 2010–2017, n=1,811)** — the same group's
-    prior binary-triage study draws on KKH SCHF radiographs. Determine and state whether this study's
-    cases overlap theirs, and confirm no contamination between their training set and this study's test
-    set (or vice versa). Cite as prior work; frame this study as the ordinal-grading extension. This is
-    the single most important data-provenance item.
+17. **Cohort vs Mishra et al. (*Injury* 2026, KKH 2010–2017, n=1,811):** treated as **distinct,
+    non-overlapping** KKH cohorts — state the basis (separate collection/time period) and that no cases
+    are shared. Cite as the group's prior work; frame this study as the ordinal-grading extension.
 
 ---
 
