@@ -149,12 +149,21 @@ surgically decisive Grade IIB boundary as the primary endpoint.
 
 ### Patient Cohort
 Retrospective study approved by [IRB], protocol [no.], [consent waived/obtained]. Consecutive
-patients [date range] from [institution] with paired AP and lateral elbow radiographs were
-included. Inclusion: [age threshold; paired views]. Exclusion: [missing view, poor quality,
-cast/splint obscuring anatomy, prior fixation]. Inclusion is shown in Figure 2. [State the
-external/supplementary "Pedia XHF" dataset and its role: it contributed to training/retraining;
-whether it also contributed test cases must be stated — see Part F.] Acquisition and preprocessing
-detail is in Appendix S1.
+patients [date range] from [institution, KKH] with paired AP and lateral elbow radiographs were
+included. Inclusion: [age threshold; paired views]. Exclusion: [poor quality, cast/splint
+obscuring anatomy, prior fixation]. The internal (KKH) cohort comprised 680 AP and 682 lateral
+radiographs across six categories (Normal, Grade 1, Grade 2a, Grade 2b, Grade 3, and flexion
+type; Table 1); [state the corresponding number of unique patients — the counts here are per
+image, and patient-level totals are required to substantiate patient-level splitting]. Inclusion
+is shown in Figure 2. A supplementary external set (Pedia) of 150 AP and 184 lateral radiographs
+was used to enrich under-represented surgical grades during retraining; it is composed almost
+entirely of Grade 3 (all 150 AP) and, on lateral views, Grade 3, Grade 2b, and Grade 2a (Table
+1). Because Pedia was used for retraining it does not constitute external validation, and its
+grade-skewed composition is stated as a design choice. [Confirm whether Pedia cases entered the
+test partition; if so, the affected class denominators changed — see Results and Part G.]
+Handling of flexion-type fractures within the cascade [merged with the operative/Grade III
+pathway / excluded — state] is defined in Appendix S1. Acquisition and preprocessing detail is in
+Appendix S1.
 
 ### Reference Standard
 [Two] blinded pediatric orthopedic surgeons ([X], [Y] years) independently assigned the Gartland
@@ -254,9 +263,43 @@ available on request].
 ## PART E — Results *(mirrors Methods; real classifier numbers filled)*
 
 ### Patient Characteristics
-Figure 2 outlines selection: [n] enrolled, [n] excluded ([reasons]), [n] analyzed, split
-patient-level into training (n=[n]), validation (n=[n]), test (n=[n]). Grade distribution and
-baseline characteristics are in Table 1. Reference-standard interobserver agreement was κ = [X].
+Figure 2 outlines selection: [n patients / n images] analyzed, split at the patient level into
+training (n=[n]), validation (n=[n]), and test (n=[n]). Baseline characteristics are in Table 1;
+reference-standard interobserver agreement was κ = [X].
+
+**Table 1 — Dataset composition (radiographs by class and view).** *Internal cohort = KKH;
+supplementary external set = Pedia. Counts are per image; corresponding patient counts to be
+added.*
+
+| Class | KKH AP | KKH LAT | Pedia AP | Pedia LAT |
+|---|---:|---:|---:|---:|
+| Normal | 121 | 122 | 0 | 0 |
+| Flexion type | 7 | 12 | 0 | 2 |
+| Grade 1 | 194 | 192 | 0 | 3 |
+| Grade 2a | 169 | 170 | 0 | 27 |
+| Grade 2b | 63 | 71 | 0 | 63 |
+| Grade 3 | 126 | 115 | 150 | 89 |
+| **Total** | **680** | **682** | **150** | **184** |
+
+The class distribution is markedly imbalanced, and Grade 2b — the surgical IIB class at the
+primary node — is the smallest fracture category (63 AP, 71 lateral in KKH), which accounts for
+the small Exp4 denominator and the wide confidence interval on the primary endpoint. The
+supplementary Pedia set is concentrated in the surgical grades (Grade 3 and, on lateral views,
+Grade 2b), roughly doubling the lateral Grade 2b count available for training; its addition
+therefore changes the class balance and, if applied to the test partition, the Exp4/Exp2
+denominators (see Effect of Pipeline Quality Control, and Part G).
+
+**Cascade node composition (KKH reference standard, per view used).**
+
+| Node | View | Positive vs negative | Counts (images) |
+|---|---|---|---|
+| Exp1 | AP | Fracture vs Normal | 559 vs 121 |
+| Exp2 | AP | Grade 3 vs Grade 1+2a+2b | 126 vs 426 |
+| Exp3 | LAT | Grade 2 (2a+2b) vs Grade 1 | 241 vs 192 |
+| Exp4 | LAT | Grade 2b vs Grade 2a | 71 vs 170 |
+
+[Confirm flexion-type routing; the seven AP / twelve lateral flexion cases are not represented in
+the four-node table above and must be assigned or excluded explicitly.]
 
 ### Node-conditional Classification *(post-alignment, DRUE-filtered; 3-seed mean ± SD; pooled recall 95% CI)*
 
@@ -418,8 +461,17 @@ proximal-mask fraction, Exp4 threshold value, per-node DRUE 95th-percentile thre
 scaling confirmation, software/library versions.
 
 **Design / governance:** IRB number + consent; reference-standard reader count (drop κ endpoints if
-single-reader); Pedia XHF role (training vs any test contribution) fixed before partitioning; target-
-journal prior-submission (coursework) policy.
+single-reader); target-journal prior-submission (coursework) policy.
+
+**Dataset (from the overall-dataset table):**
+13. Report **patient counts**, not only image counts (680 AP / 682 LAT images may be ~200 patients
+    with multiple images each) — the patient-level split claim depends on this.
+14. State **flexion-type routing** (7 AP / 12 LAT KKH; 2 LAT Pedia): merged into the operative/Grade 3
+    pathway, handled as a separate node, or excluded — it is absent from the four-node cascade as drawn.
+15. Confirm whether **Pedia entered the test partition**; Pedia is Grade-3/2b-skewed, so if it did, the
+    Exp2/Exp4 test denominators changed and the +External column is not like-for-like (ties to item 5).
+16. Describe Pedia as **targeted minority-class augmentation for retraining, not external validation**
+    (it is used in training and contains no Normal/Grade 1 on AP).
 
 ---
 
