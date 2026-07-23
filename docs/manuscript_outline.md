@@ -114,11 +114,12 @@ Grade IIB boundary as the primary endpoint.
   F1 at every cascade node (Grade III vs I+II, 0.82→0.88; Grade I vs II, 0.74→0.82; Grade IIA vs
   IIB, 0.72→0.76), with external-dataset retraining adding further gains (to 0.89, 0.85, and 0.78,
   respectively).
-- ■ Beyond classification, the framework generated clinically recognized anatomic evidence —
-  automated Baumann angle on AP views and anterior humeral line and cortical-width analysis on
-  lateral views — and flagged predictions discordant with this anatomic evidence for review
-  [PENDING numeric result: Baumann MAE [X]° / ICC [X]; flag rate [X]%; misclassification detection
-  [AUC/sensitivity X] — requires the measurement-agreement and consistency evaluations, not yet run].
+- ■ View-specific anatomic modules localized the structures underlying each measurement with high
+  fidelity — humeral segmentation for Baumann-angle estimation (mask mAP50 94.1%, mAP50–95 88.2%;
+  validation) and capitellum localization for the anterior humeral line (median error 6.5 px; test
+  n=87), with zero-shot SAM2 forearm segmentation at 87% success — providing auditable anatomic
+  evidence for each prediction [Baumann-angle agreement (MAE/ICC) and cross-module consistency
+  remain the measurement endpoints, reported in Results / pending].
 
 ### Keywords
 Pediatric, Elbow, Supracondylar Humerus Fracture, Gartland Classification, Deep Learning,
@@ -227,16 +228,17 @@ or positive-class F1), with the full precision–recall curve reported. Grad-CAM
 was used post hoc for attention assessment and as input to Module 4.
 
 ### Module 3 — View-specific Anatomic Measurement
-**AP — automated Baumann angle.** A YOLO instance-segmentation model segmented the distal humerus
+**AP — automated Baumann angle.** A YOLO instance-segmentation model (single humerus class; trained
+on 121 AP radiographs, 97 train / 24 validation) segmented the distal humerus
 and shaft; the humeral component was isolated (largest connected component, forearm excluded by
 [rule]); PCA on the proximal [fraction] of the mask gave the shaft axis; a robust iterative
 least-squares fit (2.5-SD clipping, three iterations) gave the distal physeal line; the Baumann
 angle is [the acute angle between them / its complement — state convention matching the readers].
 Angles were computed on isotropically scaled images (letterbox padding; no anisotropic scaling in
 the measurement path). **Lateral.** Zero-shot SAM2 (sam2_hiera_large) segmented the humerus and
-forearm; a ResNet-18 coordinate regressor localized the capitellum; the AHL was constructed from
-the distal anterior cortex and assessed for capitellar bisection; cortical width was profiled
-across [n] cross-sections.
+forearm; a ResNet-18 coordinate regressor (trained on 615 labelled lateral images, 447 train / 81
+validation / 87 test) localized the capitellum; the AHL was constructed from the distal anterior
+cortex and assessed for capitellar bisection; cortical width was profiled across [n] cross-sections.
 
 ### Module 4 — Cross-module Consistency Verification
 (a) *Attention–anatomy consistency:* Grad-CAM activation was compared with the anatomic
@@ -366,10 +368,17 @@ report the same progression in positive-class recall with seed variance, since t
 within the seed SD.)*
 
 ### AP Segmentation, Baumann Angle, Lateral Pipeline
-[YOLO mask mAP/Dice — reported separately from angle error.] [Baumann MAE, median, ICC(2,1),
-Bland–Altman bias + limits, %within ±3°/±5°, failure rate, inter-reader ceiling — Fig 3.] [SAM2
-Dice; capitellum median localization error; AHL bisection agreement; cortical-profile agreement —
-Fig 4.]
+**AP humerus segmentation** (YOLO instance segmentation; 121 AP images, 97 train / 24 validation,
+single humerus class): mask mAP50 94.1%, mAP50–95 88.2%, precision 81.3%, recall 96.8% (validation
+set, n=24). *Segmentation quality is reported separately from — and is not a surrogate for —
+Baumann-angle accuracy.*
+**Automated Baumann angle:** [MAE, median AE, ICC(2,1), Bland–Altman bias + 95% limits, %within
+±3°/±5°, failure rate, inter-reader ceiling — Fig 3; requires automated-vs-manual comparison,
+pending].
+**Lateral pipeline:** capitellum localization (ResNet-18 coordinate regression; 615 labelled
+images, 447/81/87 split) test error median 6.5 px (mean 7.2 px, p90 11.1 px, n=87; [convert to mm
+where pixel spacing is available]); zero-shot SAM2 forearm/humerus segmentation success 87%; [AHL
+bisection agreement and cortical-profile agreement — pending — Fig 4].
 
 ### Cross-module Consistency and OOD
 [IoU distribution by correct/incorrect; AUC of IoU for misclassification.] [Rule-discordance flag
@@ -428,7 +437,9 @@ separate collection period], with no shared cases.
 **¶7 Limitations.** Single-institution retrospective cohort of limited size; YOLO developed on 90
 images; segmentation metrics do not guarantee angle accuracy; Baumann angle sensitivity to
 positioning; physeal-line dependence on distal segmentation; reference-measurement observer
-variability; wide CIs at the IIA/IIB node; the DRUE threshold is a single in-distribution
+variability; YOLO humerus segmentation was developed on 121 AP images with metrics from a
+24-image validation set (no separate held-out segmentation test set); wide CIs at the IIA/IIB
+node; the DRUE threshold is a single in-distribution
 percentile; and no prospective or external workflow validation has been performed. A prospective
 **silent-mode (shadow) trial at KKH — the institution that provided the development cohort** — in
 which the framework runs alongside routine interpretation with predictions logged but not surfaced
