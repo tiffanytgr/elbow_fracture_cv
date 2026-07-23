@@ -310,13 +310,19 @@ the four-node table above and must be assigned or excluded explicitly.]
 
 ### Node-conditional Classification *(post-alignment, DRUE-filtered; 3-seed mean ± SD; pooled recall 95% CI)*
 
-| Node | Positive class | n₊ (test) | Config | Weighted F1 | **Positive-class recall** | Pooled recall 95% CI | Precision |
-|---|---|---|---|---|---|---|---|
-| Exp1 | Fracture | ~83 | LS | 0.878 ± 0.023 | **96.4% ± 1.0** | [93.2, 98.3] | 90.6% |
-| Exp2 | Grade III | ~19 | Baseline | 0.835 ± 0.015 | **49.1% ± 5.0** | [35.6, 62.7] | 75.5% |
-| Exp3 | Grade II | ~36 | LS+Dropout | 0.742 ± 0.040 | **81.5% ± 5.2** | [72.9, 88.3] | 74.5% |
-| **Exp4** | **Grade IIB** | **~10** | LS+MixUp *(max-F1)* | 0.699 ± 0.084 | **33.3% ± 18.9** | **[17.3, 52.8]** | 52.8% |
-| **Exp4** | **Grade IIB** | **~10** | Baseline *(max-recall)* | 0.686 ± 0.010 | **60.0% ± 14.1** | **[40.6, 77.3]** | 43.9% |
+| Node | Positive class | Test set (n) | n₊ (positive) | Config | Weighted F1 | **Positive-class recall** | Pooled recall 95% CI | Precision |
+|---|---|---|---|---|---|---|---|---|
+| Exp1 | Fracture | 101 | 83 | LS | 0.878 ± 0.023 | **96.4% ± 1.0** | [93.2, 98.3] | 90.6% |
+| Exp2 | Grade III | 83 | 19 | Baseline | 0.835 ± 0.015 | **49.1% ± 5.0** | [35.6, 62.7] | 75.5% |
+| Exp3 | Grade II | 65 | 36 | LS+Dropout | 0.742 ± 0.040 | **81.5% ± 5.2** | [72.9, 88.3] | 74.5% |
+| **Exp4** | **Grade IIB** | 36 | 10 | LS+MixUp *(max-F1)* | 0.699 ± 0.084 | **33.3% ± 18.9** | **[17.3, 52.8]** | 52.8% |
+| **Exp4** | **Grade IIB** | 36 | 10 | Baseline *(max-recall)* | 0.686 ± 0.010 | **60.0% ± 14.1** | **[40.6, 77.3]** | 43.9% |
+
+*Test set (n) = total test images at that node; n₊ = positive-class count (the recall denominator).
+Node totals differ because each cascade node operates on a different reference-standard subset.
+Across the full dataset the corresponding class totals are far larger (Table 1) — e.g., Grade 2b:
+71 lateral in KKH plus 63 in Pedia — but the test partition is 15% of the data, which is what the
+recall CIs reflect.*
 
 The table reports positive-class recall; the corresponding negative-class recall at Exp3 —
 **Grade I recall — was 65.5% ± 2.8** (pooled 57/87; 95% CI [54.6, 75.4]), i.e., Grade I is
