@@ -395,10 +395,12 @@ images; segmentation metrics do not guarantee angle accuracy; Baumann angle sens
 positioning; physeal-line dependence on distal segmentation; reference-measurement observer
 variability; wide CIs at the IIA/IIB node; the DRUE threshold is a single in-distribution
 percentile; and no prospective or external workflow validation has been performed. A prospective
-**silent-mode (shadow) trial** — in which the framework runs alongside routine interpretation with
-predictions logged but not surfaced to the treating team, so no patient care is affected — is
-intended as the next validation step [PLACEHOLDER: not yet initiated; add protocol/registration/
-timeline once available, or omit if not started by submission].
+**silent-mode (shadow) trial at KKH — the institution that provided the development cohort** — in
+which the framework runs alongside routine interpretation with predictions logged but not surfaced
+to the treating team, so no patient care is affected, is intended as the next validation step. This
+would provide internal prospective validation; external multi-institutional validation remains a
+subsequent requirement [PLACEHOLDER: not yet initiated; add protocol/registration/timeline once
+available, or omit if not started by submission].
 
 **¶8 Conclusion.** In conclusion, an anatomically grounded framework integrating autoencoder-
 pretrained hierarchical ResNet-18 classification with automated AP and lateral anatomic measurements
