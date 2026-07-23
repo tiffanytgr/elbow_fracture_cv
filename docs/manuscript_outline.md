@@ -106,13 +106,19 @@ classification of pediatric supracondylar humerus fractures, evaluated at the su
 Grade IIB boundary as the primary endpoint.
 
 ### Key Points *(each carries a number)*
-- ■ An autoencoder-pretrained hierarchical ResNet-18 cascade classified Gartland grade from paired
-  AP and lateral radiographs; node-conditional Grade IIB recall at the surgical boundary was [final]% (95% CI [X, X]).
-- ■ View-specific measurement modules produced clinically recognized quantities — automated
-  Baumann angle (MAE [X]°; ICC [X]) on AP and anterior humeral line and cortical-width analysis on
-  lateral — as auditable evidence for each prediction.
-- ■ Cross-module disagreement between the learned classifier and independent anatomic measurement
-  flagged [X]% of cases and detected misclassifications with [AUC/sensitivity X].
+- ■ An autoencoder-pretrained hierarchical ResNet-18 cascade classified Gartland grade across four
+  decision nodes from paired AP and lateral radiographs; node-conditional recall was 96% (95% CI:
+  93, 98) for fracture detection and 60% (95% CI: 41, 77) for Grade IIB at the surgical boundary
+  under recall-oriented model selection.
+- ■ Anatomically guided image standardization and out-of-distribution filtering improved weighted
+  F1 at every cascade node (Grade III vs I+II, 0.82→0.88; Grade I vs II, 0.74→0.82; Grade IIA vs
+  IIB, 0.72→0.76), with external-dataset retraining adding further gains (to 0.89, 0.85, and 0.78,
+  respectively).
+- ■ Beyond classification, the framework generated clinically recognized anatomic evidence —
+  automated Baumann angle on AP views and anterior humeral line and cortical-width analysis on
+  lateral views — and flagged predictions discordant with this anatomic evidence for review
+  [PENDING numeric result: Baumann MAE [X]° / ICC [X]; flag rate [X]%; misclassification detection
+  [AUC/sensitivity X] — requires the measurement-agreement and consistency evaluations, not yet run].
 
 ### Keywords
 Pediatric, Elbow, Supracondylar Humerus Fracture, Gartland Classification, Deep Learning,
