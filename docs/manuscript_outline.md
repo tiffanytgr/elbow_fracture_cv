@@ -315,10 +315,13 @@ was wide given the small surgical subset. The impact of the framework was cleare
 separation: the anatomic-standardization and out-of-distribution quality-control steps raised
 weighted F1 from 0.82 to 0.88 for Grade III versus I+II, 0.74 to 0.82 for Grade I versus II, and 0.72
 to 0.76 for Grade IIA versus IIB, with external-dataset retraining adding further gains to 0.89,
-0.85, and 0.78, respectively (fracture detection, 0.88). These improvements were driven by the
-anatomic-standardization and filtering pipeline rather than the classifier alone, indicating that
-the framework's preprocessing and quality-control design — not model capacity — accounted for the
-gains in grade classification. Weighted F1 is reported for comparability only; recall at the
+0.85, and 0.78, respectively (fracture detection, 0.88). These gains are attributable to the
+anatomic-standardization and filtering pipeline rather than the classifier alone: in the
+preprocessing ablation, which holds the classifier architecture fixed while adding each
+standardization and quality-control step (Effect of Pipeline Quality Control, Part E / Table [n];
+Appendix S2, B.1), weighted F1 rose at every node, whereas the representation-learning ablation
+(random vs ImageNet vs autoencoder initialization; Appendix S2, B.2) isolates the classifier's
+own contribution [state result]. Weighted F1 is reported for comparability only; recall at the
 surgical boundary remains the limiting metric, and the contribution is an interpretable, auditable
 framework rather than a high-accuracy autonomous grader.
 
