@@ -174,8 +174,11 @@ were obtained independently by [two] readers to validate the AP measurement pipe
 Interobserver agreement is reported as the reference ceiling.
 
 ### Study Design and Partitioning
-All splits were patient-level; every image from a patient remained in one partition.
-Partitioning preceded autoencoder pretraining, YOLO training, capitellum-regressor training,
+Data were split approximately 70% / 15% / 15% into training, validation, and test partitions
+(e.g., 588 / 121 / 121 for the AP cohort and 233 / 49 / 49 for the Exp4 lateral subset).
+[Partitioning was performed per view at the image level; confirm patient-level consistency — that
+a patient's AP and lateral views and any repeated examinations fall in the same partition — see
+Part G.] Partitioning preceded autoencoder pretraining, YOLO training, capitellum-regressor training,
 classifier training, threshold selection, and geometric-pipeline development. Autoencoder
 pretraining used training-partition images only. The test partition was not used for model,
 hyperparameter, checkpoint, or threshold selection.
@@ -265,9 +268,10 @@ available on request].
 ## PART E — Results *(mirrors Methods; real classifier numbers filled)*
 
 ### Patient Characteristics
-Figure 2 outlines selection: [n patients / n images] analyzed, split at the patient level into
-training (n=[n]), validation (n=[n]), and test (n=[n]). Baseline characteristics are in Table 1;
-reference-standard interobserver agreement was κ = [X].
+Figure 2 outlines selection: [n patients / n images] analyzed, split 70% / 15% / 15% into
+training, validation, and test partitions (per view; e.g., AP 588/121/121, lateral Exp4 subset
+233/49/49). Baseline characteristics are in Table 1; reference-standard interobserver agreement
+was κ = [X].
 
 **Table 1 — Dataset composition (radiographs by class and view).** *Internal cohort = KKH (682
 patients; 680 with a paired AP view). Supplementary set = Pedia (184 patients; 150 with AP),
@@ -314,6 +318,10 @@ the four-node table above and must be assigned or excluded explicitly.]
 | **Exp4** | **Grade IIB** | **~10** | LS+MixUp *(max-F1)* | 0.699 ± 0.084 | **33.3% ± 18.9** | **[17.3, 52.8]** | 52.8% |
 | **Exp4** | **Grade IIB** | **~10** | Baseline *(max-recall)* | 0.686 ± 0.010 | **60.0% ± 14.1** | **[40.6, 77.3]** | 43.9% |
 
+The table reports positive-class recall; the corresponding negative-class recall at Exp3 —
+**Grade I recall — was 65.5% ± 2.8** (pooled 57/87; 95% CI [54.6, 75.4]), i.e., Grade I is
+identified less reliably than Grade II, with Grade 1 cases most often over-called as Grade 2.
+
 Two findings are load-bearing for the paper: (a) at the primary node, selecting the configuration
 by weighted F1 (LS+MixUp) yields IIB recall of 33.3% ± 18.9, whereas a recall-oriented selection
 (Baseline) yields 60.0% ± 14.1 at statistically indistinguishable F1 — model selection must be
@@ -355,9 +363,9 @@ segmentation and alignment failures — Fig 5, Fig 6.] [Predicted vs recorded ma
 ## PART F — Discussion
 
 **¶1 Principal findings.** In this feasibility evaluation, the framework classified all four Gartland
-decision nodes, with node-conditional recall of 96% (fracture detection), 49% (Grade III), 82%
-(Grade II), and 33–60% (Grade IIB, depending on model selection); the Grade IIB confidence interval
-was wide given the small surgical subset. The impact of the framework was clearest in grade
+decision nodes, with node-conditional recall of 96% (fracture detection), 49% (Grade III), 66%
+(Grade I), 82% (Grade II), and 33–60% (Grade IIB, depending on model selection); the Grade IIB
+confidence interval was wide given the small surgical subset. The impact of the framework was clearest in grade
 separation: the anatomic-standardization and out-of-distribution quality-control steps raised
 weighted F1 from 0.82 to 0.88 for Grade III versus I+II, 0.74 to 0.82 for Grade I versus II, and 0.72
 to 0.76 for Grade IIA versus IIB, with external-dataset retraining adding further gains to 0.89,
