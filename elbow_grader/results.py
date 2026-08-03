@@ -151,6 +151,19 @@ class GraderResult:
             experiments as stacked rows of (Original | Overlay | Heatmap).
         """
         import matplotlib.pyplot as plt
+        import numpy as np
+
+        def _square_canvas(image):
+            """Centre an image on a square canvas without resizing or distortion."""
+            array = np.asarray(image)
+            height, width = array.shape[:2]
+            side = max(height, width)
+            shape = (side, side) if array.ndim == 2 else (side, side, array.shape[2])
+            canvas = np.zeros(shape, dtype=array.dtype)
+            y0 = (side - height) // 2
+            x0 = (side - width) // 2
+            canvas[y0:y0 + height, x0:x0 + width] = array
+            return canvas
 
         arts = self._r.debug_artifacts
         exp_map = {
@@ -185,18 +198,20 @@ class GraderResult:
             pred_label = exp.labels[exp.pred_idx]
             conf = exp.probs[exp.pred_idx] if exp.probs else None
 
-            axes[i, 0].imshow(gc["original"], cmap="gray")
+            axes[i, 0].imshow(_square_canvas(gc["original"]), cmap="gray")
             axes[i, 0].set_title("Original", fontsize=7)
             axes[i, 0].axis("off")
 
             overlay_title = f"Pred: {pred_label}"
             if conf is not None:
                 overlay_title += f" ({conf:.1%})"
-            axes[i, 1].imshow(gc["overlay"])
+            axes[i, 1].imshow(_square_canvas(gc["overlay"]))
             axes[i, 1].set_title(overlay_title, fontsize=7)
             axes[i, 1].axis("off")
 
-            axes[i, 2].imshow(gc["heatmap"], cmap="jet", vmin=0, vmax=1)
+            axes[i, 2].imshow(
+                _square_canvas(gc["heatmap"]), cmap="jet", vmin=0, vmax=1
+            )
             axes[i, 2].set_title("Heatmap", fontsize=7)
             axes[i, 2].axis("off")
 
@@ -247,7 +262,7 @@ class GraderResult:
             ahl_b=ahl.get("ahl_b"),
             cap_centroid=cap_centroid,
             cap_radius=cap_radius,
-            title=f"Geometric grade: {g.final_grade or '?'}",
+            title="",
         )
 
     def plot_cortical_width(self) -> "plt.Figure":
@@ -284,7 +299,6 @@ class GraderResult:
             )
             ax_left.imshow(_fig_to_array(fig_xray))
             ax_left.axis("off")
-            ax_left.set_title("Width measurements on X-ray", fontsize=8)
             plt.close(fig_xray)
         else:
             ax_left.text(0.5, 0.5, "Image not available", ha="center", va="center")
@@ -293,13 +307,8 @@ class GraderResult:
         fig_profile = plot_width_profile(g.width_profile)
         ax_right.imshow(_fig_to_array(fig_profile))
         ax_right.axis("off")
-        ax_right.set_title("Cortical width profile", fontsize=8)
         plt.close(fig_profile)
 
-        mr = g.width_profile.get("match_ratio", 0)
-        grade = g.grade_2ab or "n/a"
-        fig.suptitle(f"Grade 2a vs 2b: {grade}  (match ratio = {mr:.2f})",
-                     fontsize=10, fontweight="bold")
         fig.tight_layout()
         return fig
 

@@ -2,6 +2,7 @@ import { Info, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { PredictResponse } from "@/lib/types";
+import { getBoneProfileUnavailableMessage } from "@/lib/resultDescriptions";
 
 interface CorticalWidthTabProps {
   result: PredictResponse;
@@ -29,7 +30,7 @@ export function CorticalWidthTab({ result }: CorticalWidthTabProps) {
     return (
       <div className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
         <Info className="w-4 h-4" />
-        No cortical width data — LAT geometric track did not run or did not reach Grade 2.
+        {getBoneProfileUnavailableMessage(g)}
       </div>
     );
   }

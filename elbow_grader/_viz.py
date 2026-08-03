@@ -25,7 +25,10 @@ def render_overlays(aligned_lat: np.ndarray,
                     cap_radius: Optional[int] = None,
                     title: str = "SAM2 explainability") -> plt.Figure:
     """Aligned LAT image with humerus/forearm/capitellum masks + AHL line."""
-    fig, ax = plt.subplots(1, 1, figsize=(1.8, 1.8))
+    # Generate a sufficiently large square figure for the web results view.
+    # The source image remains unscaled geometrically; Matplotlib only renders
+    # the same overlay at a higher display resolution.
+    fig, ax = plt.subplots(1, 1, figsize=(4, 4))
     ax.imshow(_to_rgb(aligned_lat))
     H, W = aligned_lat.shape[:2]
 
@@ -55,7 +58,8 @@ def render_overlays(aligned_lat: np.ndarray,
 
     ax.set_xlim(0, W)
     ax.set_ylim(H, 0)
-    ax.set_title(title, fontsize=7)
+    if title:
+        ax.set_title(title, fontsize=7)
     ax.axis("off")
     if ahl_a is not None:
         ax.legend(loc="upper right", fontsize=5)

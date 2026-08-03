@@ -1,6 +1,7 @@
 import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { PredictResponse } from "@/lib/types";
+import { getBaumannUnavailableMessage } from "@/lib/resultDescriptions";
 
 interface BaumannTabProps {
   result: PredictResponse;
@@ -19,17 +20,6 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-const STATUS_MESSAGES: Record<string, string> = {
-  no_yolo_ckpt:
-    "YOLO humerus model checkpoint not found on the server. Contact the administrator.",
-  no_mask:
-    "Humerus was not detected in this image — check image quality or field of view.",
-  no_shaft:
-    "Could not fit a shaft axis — ensure the full humerus shaft is visible.",
-  no_physis:
-    "Could not fit the physeal line — check image quality and distal humerus visibility.",
-};
-
 export function BaumannTab({ result }: BaumannTabProps) {
   const b = result.baumann;
 
@@ -37,7 +27,7 @@ export function BaumannTab({ result }: BaumannTabProps) {
     return (
       <div className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
         <Info className="w-4 h-4" />
-        Baumann angle not available — provide an AP image to enable this.
+        {getBaumannUnavailableMessage(null)}
       </div>
     );
   }
@@ -46,11 +36,7 @@ export function BaumannTab({ result }: BaumannTabProps) {
           physis_angle_deg, physis_confidence } = b;
 
   if (status !== "ok") {
-    const msg =
-      STATUS_MESSAGES[status] ??
-      (status.startsWith("error:")
-        ? `Pipeline error: ${status.replace("error:", "").trim()}`
-        : `Baumann pipeline could not complete (status: ${status}).`);
+    const msg = getBaumannUnavailableMessage(status);
     return (
       <div className="py-4 space-y-3">
         <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
