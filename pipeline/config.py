@@ -26,7 +26,9 @@ class PipelineConfig:
     exp4_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "exp4" / "best_model_for_analysis.pth"
     cap_regressor_ckpt: Path  = _EXPERIMENTS / "checkpoints" / "cap_regressor" / "best_model.pth"
     sam2_ckpt: Path           = _EXPERIMENTS / "checkpoints" / "sam2" / "sam2_hiera_large.pt"
-    sam2_config: str          = "sam2_hiera_l.yaml"
+    # Meta's current SAM2 package namespaces the original SAM2 configs under
+    # configs/sam2/.  The full Hydra config name is required by recent builds.
+    sam2_config: str          = "configs/sam2/sam2_hiera_l.yaml"
     yolo_baumann_ckpt: Optional[Path] = _EXPERIMENTS / "checkpoints" / "yolo" / "exp.pt"
 
     # === DRUE OOD filter checkpoints (per experiment) ===

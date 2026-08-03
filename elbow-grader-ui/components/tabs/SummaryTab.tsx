@@ -13,14 +13,6 @@ const GRADE_COLORS: Record<string, { badge: string; card: string }> = {
   "Grade 3":  { badge: "bg-red-100 text-red-800 border-red-200",       card: "border-red-200 bg-red-50" },
 };
 
-const GARTLAND_REFERENCE = [
-  { grade: "Normal",    color: "bg-green-500",  description: "No fracture" },
-  { grade: "Grade 1",   color: "bg-sky-500",    description: "Undisplaced — AHL transects capitellum middle third" },
-  { grade: "Grade 2a",  color: "bg-amber-500",  description: "Posterior displacement, no rotation — AHL anterior to capitellum" },
-  { grade: "Grade 2b",  color: "bg-orange-500", description: "Grade 2 + rotational malalignment" },
-  { grade: "Grade 3",   color: "bg-red-500",    description: "Complete displacement" },
-];
-
 function MetricCard({ label, value, colorClass }: { label: string; value: string; colorClass?: string }) {
   return (
     <Card className={colorClass}>
@@ -74,43 +66,6 @@ export function SummaryTab({ result }: SummaryTabProps) {
         </div>
       )}
 
-      {/* Gartland reference */}
-      <details className="rounded-lg border border-border">
-        <summary className="cursor-pointer px-4 py-2 text-sm font-medium hover:bg-muted select-none">
-          Gartland Classification Reference
-        </summary>
-        <div className="px-4 py-3 space-y-2">
-          {GARTLAND_REFERENCE.map(({ grade: g, color, description }) => (
-            <div key={g} className="flex items-start gap-3">
-              <span className={`mt-1 inline-block w-3 h-3 rounded-full flex-shrink-0 ${color}`} />
-              <div>
-                <span className="text-sm font-semibold">{g}</span>
-                <span className="text-sm text-muted-foreground"> — {description}</span>
-              </div>
-            </div>
-          ))}
-          <p className="text-xs text-muted-foreground pt-2">
-            AHL = Anterior Humeral Line drawn along the anterior cortex of the humerus on the lateral X-ray.
-            In a normal elbow it transects the middle third of the capitellum.
-          </p>
-        </div>
-      </details>
-
-      {/* Pipeline log */}
-      {result.log.length > 0 && (
-        <details className="rounded-lg border border-border">
-          <summary className="cursor-pointer px-4 py-2 text-sm font-medium hover:bg-muted select-none">
-            Technical log ({result.log.length} lines)
-          </summary>
-          <div className="px-4 py-3 bg-slate-50 rounded-b-lg max-h-64 overflow-y-auto">
-            {result.log.map((line, i) => (
-              <p key={i} className="text-xs font-mono text-slate-600 leading-relaxed">
-                {line}
-              </p>
-            ))}
-          </div>
-        </details>
-      )}
     </div>
   );
 }

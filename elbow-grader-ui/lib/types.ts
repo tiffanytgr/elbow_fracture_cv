@@ -44,6 +44,12 @@ export interface GeometricData {
   width_profile: WidthProfileSummary | null;
 }
 
+export interface RegressorBaumannData {
+  baumann_angle_deg: number | null;
+  in_normal_range: boolean | null;
+  keypoints: [number, number][] | null;
+}
+
 export interface PredictResponse {
   final_grade: string | null;
   cnn_grade: string | null;
@@ -66,6 +72,7 @@ export interface PredictResponse {
     exp4: ExperimentResult | null;
   };
   baumann: BaumannData | null;
+  regressor_baumann?: RegressorBaumannData | null;
   geometric: GeometricData | null;
   /** Keys: gradcam_1..4, geometric, cortical_width, baumann — base64 PNG */
   plots: Record<string, string>;

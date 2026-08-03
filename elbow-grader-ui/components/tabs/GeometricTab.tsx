@@ -2,6 +2,7 @@ import { Info, CheckCircle2, XCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { PredictResponse } from "@/lib/types";
+import { getAhlUnavailableMessage } from "@/lib/resultDescriptions";
 
 interface GeometricTabProps {
   result: PredictResponse;
@@ -29,7 +30,7 @@ export function GeometricTab({ result }: GeometricTabProps) {
     return (
       <div className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
         <Info className="w-4 h-4" />
-        Geometric track skipped: {g?.skipped_reason ?? "no LAT input"}
+        {getAhlUnavailableMessage(g)}
       </div>
     );
   }
@@ -45,12 +46,12 @@ export function GeometricTab({ result }: GeometricTabProps) {
       {/* SAM2 overlay */}
       {overlayPlot && (
         <div>
-          <h3 className="text-sm font-semibold mb-2">SAM2 Segmentation Overlay</h3>
+          <h3 className="text-lg font-semibold mb-1">SAM2 Segmentation Overlay</h3>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`data:image/png;base64,${overlayPlot}`}
             alt="SAM2 overlay"
-            className="rounded-md max-w-xs"
+            className="h-auto w-full max-w-[360px] rounded-md sm:max-w-[480px] md:max-w-xl lg:max-w-2xl"
           />
         </div>
       )}
@@ -116,23 +117,6 @@ export function GeometricTab({ result }: GeometricTabProps) {
         </div>
       )}
 
-      {/* AHL details */}
-      {Object.keys(ahl).length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold mb-2">AHL details</h4>
-          <pre className="text-xs bg-slate-50 rounded-lg border border-border p-3 overflow-x-auto">
-            {JSON.stringify(
-              Object.fromEntries(
-                Object.entries(ahl).filter(([k]) =>
-                  ["zone", "method", "ahl_x_at_cap", "dist_to_ahl_px", "cap_radius_px"].includes(k),
-                ),
-              ),
-              null,
-              2,
-            )}
-          </pre>
-        </div>
-      )}
     </div>
   );
 }

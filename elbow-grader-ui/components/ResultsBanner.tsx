@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, XCircle, Info } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, XCircle, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { PredictResponse } from "@/lib/types";
 
@@ -23,8 +23,55 @@ const GRADE_STYLES: Record<string, GradeStyle> = {
   "Grade 3":  { bg: "bg-red-50",    border: "border-red-300",    text: "text-red-900",    iconClass: "text-red-600",    icon: AlertTriangle },
 };
 
+const GARTLAND_REFERENCE = [
+  { grade: "Normal", color: "bg-green-500", description: "No fracture" },
+  { grade: "Grade 1", color: "bg-sky-500", description: "Undisplaced — AHL transects capitellum middle third" },
+  { grade: "Grade 2a", color: "bg-amber-500", description: "Posterior displacement, no rotation — AHL anterior to capitellum" },
+  { grade: "Grade 2b", color: "bg-orange-500", description: "Grade 2 + rotational malalignment" },
+  { grade: "Grade 3", color: "bg-red-500", description: "Complete displacement" },
+];
+
+export function GartlandReference({ currentGrade }: { currentGrade: string | null }) {
+  return (
+    <details className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50/70 shadow-sm">
+      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-100/70">
+        Gartland Classification Reference
+      </summary>
+      <div className="space-y-3 border-t border-slate-200 p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {GARTLAND_REFERENCE.map(({ grade, color, description }) => (
+          <div
+            key={grade}
+            className={`relative min-h-28 rounded-lg border bg-white p-4 shadow-sm ${
+              currentGrade === grade
+                ? "border-blue-500 ring-1 ring-blue-200"
+                : "border-slate-200"
+            }`}
+          >
+            <div className="flex items-center gap-2 pr-6">
+              <span className={`inline-block h-3 w-3 flex-shrink-0 rounded-full ${color}`} />
+              <span className="font-semibold text-slate-900">{grade}</span>
+            </div>
+            <p className="mt-2 pl-5 text-sm leading-5 text-slate-500">
+              {description}
+            </p>
+            {currentGrade === grade && (
+              <Check className="absolute right-4 top-4 h-4 w-4 text-blue-600" />
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        AHL = Anterior Humeral Line drawn along the anterior cortex of the humerus on the lateral X-ray.
+        In a normal elbow it transects the middle third of the capitellum.
+      </p>
+      </div>
+    </details>
+  );
+}
+
 export function ResultsBanner({ result, hasLat }: ResultsBannerProps) {
-  const { final_grade, grade_source, discordant, cnn_grade, geometric_grade } = result;
+  const { final_grade, grade_source, discordant } = result;
 
   const exp1 = result.experiments.exp1;
   const fractureDetectedNoLat =
@@ -35,7 +82,7 @@ export function ResultsBanner({ result, hasLat }: ResultsBannerProps) {
 
   const style = final_grade ? GRADE_STYLES[final_grade] : null;
 
-  let gradeCard: React.ReactNode;
+  let gradeCard: React.ReactNode = null;
 
   if (fractureDetectedNoLat) {
     gradeCard = (
@@ -79,8 +126,8 @@ export function ResultsBanner({ result, hasLat }: ResultsBannerProps) {
     const Icon = style.icon;
     gradeCard = (
       <div className={`flex items-center gap-3 rounded-lg border-2 px-4 py-3 ${style.bg} ${style.border}`}>
-        <Icon className={`w-5 h-5 flex-shrink-0 ${style.iconClass}`} />
-        <span className={`text-base font-bold ${style.text}`}>{final_grade}</span>
+        <Icon className={`h-5 w-5 flex-shrink-0 ${style.iconClass}`} />
+        <span className={`text-sm font-bold ${style.text}`}>{final_grade}</span>
         <Badge variant={discordant ? "warning" : "success"}>
           {discordant ? "Tracks disagree" : "Tracks agree"}
         </Badge>
@@ -92,25 +139,6 @@ export function ResultsBanner({ result, hasLat }: ResultsBannerProps) {
   }
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-base font-semibold">Classification Result</h2>
-      {gradeCard}
-
-      {/* Supporting AI tracks */}
-      {(cnn_grade || geometric_grade) && (
-        <div className="flex gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 rounded-md bg-blue-50 border border-blue-200 px-2.5 py-1.5 text-xs">
-            <span>🧠</span>
-            <span className="font-medium text-blue-800">CNN</span>
-            <Badge variant="info" className="text-xs py-0">{cnn_grade ?? "n/a"}</Badge>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-md bg-purple-50 border border-purple-200 px-2.5 py-1.5 text-xs">
-            <span>📐</span>
-            <span className="font-medium text-purple-800">Bone geometry</span>
-            <Badge variant="info" className="text-xs py-0">{geometric_grade ?? "n/a"}</Badge>
-          </div>
-        </div>
-      )}
-    </div>
+    <>{gradeCard}</>
   );
 }
