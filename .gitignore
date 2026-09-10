@@ -23,6 +23,10 @@ elbow-grader-ui/.next/
 elbow-grader-ui/.env.local
 elbow-grader-ui/out/
 
+# Case review timer logs (written on the local device at runtime)
+elbow-grader-ui/logs/
+case-timings.jsonl
+
 # Training artifacts (not needed to run the app)
 experiments/
 outputs/
@@ -46,3 +50,6 @@ Thumbs.db
 # Logs / temp
 *.log
 *.tmp
+
+# TypeScript incremental build info
+elbow-grader-ui/tsconfig.tsbuildinfo

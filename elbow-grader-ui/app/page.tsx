@@ -6,6 +6,7 @@ import { Grid2X2, Images, Loader2, Play, ShieldCheck, Sparkles, UploadCloud } fr
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sidebar } from "@/components/Sidebar";
+import { CaseTimer } from "@/components/CaseTimer";
 import { FileUploader } from "@/components/FileUploader";
 import {
   DEMO_CASES,
@@ -66,6 +67,21 @@ export default function HomePage() {
     inputMode === "upload" ? uploadVersion : demoVersion
   }:${configVersion}`;
   const resultIsStale = result !== null && currentInputKey !== resultInputKey;
+
+  // Identity of the loaded case, used to drive the review timer. The label is
+  // shown to the reviewer; the key changes whenever a new case is loaded so the
+  // timer auto-resets and restarts.
+  const caseId =
+    inputMode === "demo"
+      ? selectedDemoId
+      : [uploadedApFile?.name, uploadedLatFile?.name]
+          .filter(Boolean)
+          .join(" + ") || null;
+  const caseKey = !canRun
+    ? null
+    : inputMode === "demo"
+      ? `demo:${selectedDemoId}:${demoVersion}`
+      : `upload:${uploadVersion}`;
 
   function changeInputMode(mode: "upload" | "demo") {
     if (loading || loadingDemoId !== null || mode === inputMode) return;
@@ -300,6 +316,15 @@ export default function HomePage() {
             )}
           </div>
         </section>
+
+        {/* Case review timer */}
+        <CaseTimer
+          caseKey={caseKey}
+          caseId={caseId}
+          inputMode={inputMode}
+          finalGrade={result && !resultIsStale ? result.final_grade : null}
+          confidence={result && !resultIsStale ? result.confidence : null}
+        />
 
         {/* Step 2 — Analyse */}
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
