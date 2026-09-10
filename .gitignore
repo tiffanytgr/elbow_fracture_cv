@@ -22,6 +22,16 @@ elbow-grader-ui/node_modules/
 elbow-grader-ui/.next/
 elbow-grader-ui/.env.local
 elbow-grader-ui/out/
+elbow-control-ui/node_modules/
+elbow-control-ui/.next/
+elbow-control-ui/.env.local
+elbow-control-ui/out/
+elbow-control-ui/tsconfig.tsbuildinfo
+elbow-grader-ui/tsconfig.tsbuildinfo
+
+# Clinician assessment logs (written on the local device at runtime)
+elbow-control-ui/logs/
+assessments.jsonl
 
 # Training artifacts (not needed to run the app)
 experiments/
