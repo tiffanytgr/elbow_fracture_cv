@@ -37,8 +37,41 @@ npm start
 | Variable | Default | Description |
 |---|---|---|
 | `BACKEND_URL` | `http://localhost:8000` | FastAPI service URL |
+| `TIMER_LOG_PATH` | `logs/case-timings.jsonl` | Where case review timings are written on the local device (absolute path recommended) |
 
 Set `BACKEND_URL` in `.env.local` to point at a remote backend.
+
+## Case review timer
+
+The main page includes a **Case Review Timer** that measures how long a reviewer
+spends on each case. The timer auto-starts and resets whenever a new case is
+loaded (demo selection or upload), and supports pause/resume/reset. Clicking
+**Save time to log** appends one record to a JSON Lines file **on the machine
+running the app** (the Next.js server writes it via `POST /api/timer-log`), so
+it works for a locally-hosted deployment on a remote laptop.
+
+Each line is a JSON object, e.g.:
+
+```json
+{"case_id":"a145","reviewer":"TT","notes":null,"input_mode":"demo","final_grade":"2a","confidence":0.83,"elapsed_seconds":42.6,"elapsed_hms":"00:00:43","started_at":"2026-09-10T…","ended_at":"2026-09-10T…","logged_at":"2026-09-10T…"}
+```
+
+The default location is `elbow-grader-ui/logs/case-timings.jsonl` (git-ignored).
+Override it with `TIMER_LOG_PATH`.
+
+`GET /api/timer-log` reads the log back:
+
+| Query | Returns |
+|---|---|
+| `?limit=N` | N most recent records as JSON (shown under "Recently logged") |
+| `?format=csv` | Every record as a CSV download |
+| `?summary=1` | Grouped stats (count, mean/median/min/max/total seconds) as JSON |
+| `?summary=1&format=csv` | The same grouped stats as a CSV download |
+| `&group_by=…` | Grouping field for the summary — `final_grade` (default), `reviewer`, or `input_mode` |
+
+The summary always includes an `ALL` row alongside the per-group rows. The UI
+exposes **Download log (CSV)**, **Summary (CSV)**, and an inline summary table
+under "Recently logged".
 
 ## Architecture
 
