@@ -57,8 +57,21 @@ Each line is a JSON object, e.g.:
 ```
 
 The default location is `elbow-grader-ui/logs/case-timings.jsonl` (git-ignored).
-Override it with `TIMER_LOG_PATH`. `GET /api/timer-log?limit=N` returns the most
-recent records, which the UI shows under "Recently logged".
+Override it with `TIMER_LOG_PATH`.
+
+`GET /api/timer-log` reads the log back:
+
+| Query | Returns |
+|---|---|
+| `?limit=N` | N most recent records as JSON (shown under "Recently logged") |
+| `?format=csv` | Every record as a CSV download |
+| `?summary=1` | Grouped stats (count, mean/median/min/max/total seconds) as JSON |
+| `?summary=1&format=csv` | The same grouped stats as a CSV download |
+| `&group_by=…` | Grouping field for the summary — `final_grade` (default), `reviewer`, or `input_mode` |
+
+The summary always includes an `ALL` row alongside the per-group rows. The UI
+exposes **Download log (CSV)**, **Summary (CSV)**, and an inline summary table
+under "Recently logged".
 
 ## Architecture
 
