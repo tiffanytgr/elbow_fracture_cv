@@ -6,22 +6,24 @@ import {
   Check,
   Download,
   History,
+  Lock,
   Pause,
   Play,
-  RotateCcw,
   Save,
   Timer as TimerIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-
-const REVIEWER_STORAGE_KEY = "elbow-grader-reviewer";
+import { GradeConfidenceForm } from "@/components/GradeConfidenceForm";
+import type { ConfidenceLevel, StudyMode } from "@/lib/studyTypes";
 
 interface RecentEntry {
-  case_id: string | null;
   reviewer: string | null;
+  mode: string | null;
+  case_id: string | null;
+  pre_grade: string | null;
+  post_grade: string | null;
   elapsed_hms: string;
-  final_grade: string | null;
   logged_at: string;
 }
 
@@ -33,23 +35,21 @@ interface SummaryRow {
   total_seconds: number;
 }
 
-function formatSeconds(totalSeconds: number): string {
-  const s = Math.max(0, Math.round(totalSeconds));
-  const mm = Math.floor(s / 60);
-  const ss = s % 60;
-  return mm > 0 ? `${mm}m ${String(ss).padStart(2, "0")}s` : `${ss}s`;
-}
-
-interface CaseTimerProps {
-  /** Stable identity of the loaded case. Changing it resets & restarts the timer. */
+interface StudyPanelProps {
   caseKey: string | null;
-  /** Human-readable id/label for the current case (e.g. demo id or filenames). */
   caseId: string | null;
-  /** How the case was loaded, stored alongside the timing. */
   inputMode: string;
-  /** Optional analysis outcome, stored alongside the timing when available. */
-  finalGrade?: string | null;
-  confidence?: number | null;
+  reviewer: string;
+  mode: StudyMode;
+  /** True once the AI result is visible on the page (AI arm only). */
+  aiRevealed: boolean;
+  /** The AI's own final grade / confidence, stored alongside the reader answers. */
+  aiGrade?: string | null;
+  aiConfidence?: number | null;
+  /** Fires whenever the pre-AI answer lock state changes (gates Analyse + reveal). */
+  onPreLockedChange: (locked: boolean) => void;
+  /** Fires after a case is saved, with the caseKey that was saved. */
+  onSaved: (caseKey: string) => void;
 }
 
 function formatHms(totalMs: number): string {
@@ -61,17 +61,34 @@ function formatHms(totalMs: number): string {
   return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
 }
 
-export function CaseTimer({
+function formatSeconds(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return mm > 0 ? `${mm}m ${String(ss).padStart(2, "0")}s` : `${ss}s`;
+}
+
+export function StudyPanel({
   caseKey,
   caseId,
   inputMode,
-  finalGrade = null,
-  confidence = null,
-}: CaseTimerProps) {
+  reviewer,
+  mode,
+  aiRevealed,
+  aiGrade = null,
+  aiConfidence = null,
+  onPreLockedChange,
+  onSaved,
+}: StudyPanelProps) {
   const [running, setRunning] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [reviewer, setReviewer] = useState("");
-  const [notes, setNotes] = useState("");
+
+  const [preGrade, setPreGrade] = useState<string | null>(null);
+  const [preConf, setPreConf] = useState<ConfidenceLevel | null>(null);
+  const [preLocked, setPreLocked] = useState(false);
+  const [postGrade, setPostGrade] = useState<string | null>(null);
+  const [postConf, setPostConf] = useState<ConfidenceLevel | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -80,44 +97,37 @@ export function CaseTimer({
   const [summary, setSummary] = useState<SummaryRow[] | null>(null);
   const [showSummary, setShowSummary] = useState(false);
 
-  // Accumulated milliseconds from previous run segments, plus the timestamp
-  // the current segment started (null while paused/stopped).
   const accumulatedRef = useRef(0);
   const segmentStartRef = useRef<number | null>(null);
   const startedAtRef = useRef<string | null>(null);
 
-  // Restore the reviewer name from a previous session.
+  // Keep the parent informed of the pre-AI lock so it can gate analysis/reveal.
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(REVIEWER_STORAGE_KEY);
-      if (stored) setReviewer(stored);
-    } catch {
-      /* localStorage may be unavailable */
-    }
-  }, []);
+    onPreLockedChange(preLocked);
+  }, [preLocked, onPreLockedChange]);
 
   const loadRecent = useCallback(async () => {
     try {
-      const res = await fetch("/api/timer-log?limit=5", { cache: "no-store" });
+      const res = await fetch("/api/study-log?limit=5", { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       setRecent(Array.isArray(data.entries) ? data.entries : []);
       setLogPath(data.log_path ?? null);
     } catch {
-      /* ignore — history is best-effort */
+      /* best-effort */
     }
   }, []);
 
   const loadSummary = useCallback(async () => {
     try {
-      const res = await fetch("/api/timer-log?summary=1&group_by=final_grade", {
+      const res = await fetch("/api/study-log?summary=1&group_by=mode", {
         cache: "no-store",
       });
       if (!res.ok) return;
       const data = await res.json();
       setSummary(Array.isArray(data.summary) ? data.summary : []);
     } catch {
-      /* ignore — summary is best-effort */
+      /* best-effort */
     }
   }, []);
 
@@ -129,7 +139,7 @@ export function CaseTimer({
     if (showSummary) loadSummary();
   }, [showSummary, loadSummary]);
 
-  // Auto reset & start whenever a new case is loaded.
+  // Auto reset & start whenever a new case is loaded; clear all answers.
   useEffect(() => {
     if (!caseKey) {
       setRunning(false);
@@ -137,15 +147,20 @@ export function CaseTimer({
       accumulatedRef.current = 0;
       segmentStartRef.current = null;
       startedAtRef.current = null;
-      return;
+    } else {
+      accumulatedRef.current = 0;
+      segmentStartRef.current = Date.now();
+      startedAtRef.current = new Date().toISOString();
+      setElapsedMs(0);
+      setRunning(true);
     }
-    accumulatedRef.current = 0;
-    segmentStartRef.current = Date.now();
-    startedAtRef.current = new Date().toISOString();
-    setElapsedMs(0);
+    setPreGrade(null);
+    setPreConf(null);
+    setPreLocked(false);
+    setPostGrade(null);
+    setPostConf(null);
     setSavedAt(null);
     setSaveError(null);
-    setRunning(true);
   }, [caseKey]);
 
   // Tick while running.
@@ -179,25 +194,7 @@ export function CaseTimer({
     setRunning(true);
   }
 
-  function reset() {
-    accumulatedRef.current = 0;
-    segmentStartRef.current = running ? Date.now() : null;
-    startedAtRef.current = running ? new Date().toISOString() : null;
-    setElapsedMs(0);
-    setSavedAt(null);
-    setSaveError(null);
-  }
-
-  function currentElapsedSeconds(): number {
-    const base = accumulatedRef.current;
-    const seg =
-      running && segmentStartRef.current !== null
-        ? Date.now() - segmentStartRef.current
-        : 0;
-    return (base + seg) / 1000;
-  }
-
-  async function saveTiming() {
+  async function saveCase() {
     if (!caseKey) return;
     setSaving(true);
     setSaveError(null);
@@ -212,25 +209,20 @@ export function CaseTimer({
     setRunning(false);
 
     try {
-      const trimmedReviewer = reviewer.trim();
-      try {
-        if (trimmedReviewer) {
-          window.localStorage.setItem(REVIEWER_STORAGE_KEY, trimmedReviewer);
-        }
-      } catch {
-        /* ignore */
-      }
-
-      const res = await fetch("/api/timer-log", {
+      const res = await fetch("/api/study-log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reviewer: reviewer.trim() || null,
+          mode,
           case_id: caseId,
-          reviewer: trimmedReviewer || null,
-          notes: notes.trim() || null,
           input_mode: inputMode,
-          final_grade: finalGrade,
-          confidence,
+          pre_grade: preGrade,
+          pre_confidence: preConf,
+          post_grade: mode === "ai" ? postGrade : null,
+          post_confidence: mode === "ai" ? postConf : null,
+          ai_grade: mode === "ai" ? aiGrade : null,
+          ai_confidence: mode === "ai" ? aiConfidence : null,
           elapsed_seconds: elapsedSeconds,
           started_at: startedAtRef.current,
           ended_at: new Date().toISOString(),
@@ -242,84 +234,177 @@ export function CaseTimer({
         return;
       }
       setSavedAt(new Date().toLocaleTimeString());
-      setNotes("");
       setLogPath(data.log_path ?? logPath);
       await loadRecent();
       if (showSummary) await loadSummary();
+      onSaved(caseKey);
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Failed to save timing");
+      setSaveError(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }
   }
 
   const disabled = !caseKey;
+  const alreadySaved = savedAt !== null;
+
+  // Gate the save button per arm.
+  const preComplete = preGrade !== null && preConf !== null;
+  const postComplete = postGrade !== null && postConf !== null;
+  const canSave =
+    !disabled &&
+    !saving &&
+    !alreadySaved &&
+    (mode === "control"
+      ? preComplete
+      : preLocked && aiRevealed && postComplete);
+
+  let saveHint: string | null = null;
+  if (!disabled && !alreadySaved) {
+    if (mode === "control" && !preComplete) {
+      saveHint = "Enter a grade and confidence to save.";
+    } else if (mode === "ai" && !preLocked) {
+      saveHint = "Lock your pre-AI read first.";
+    } else if (mode === "ai" && !aiRevealed) {
+      saveHint = "Run the AI analysis, then enter your post-AI read.";
+    } else if (mode === "ai" && !postComplete) {
+      saveHint = "Enter your post-AI grade and confidence to save.";
+    }
+  }
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <TimerIcon className="h-5 w-5 text-blue-600" />
-          <h2 className="text-base font-semibold">Case Review Timer</h2>
+          <h2 className="text-base font-semibold">
+            Reader Assessment
+            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+              {mode === "ai" ? "AI-assisted arm" : "Control arm"}
+            </span>
+          </h2>
         </div>
-        <div
-          className="font-mono text-3xl font-bold tabular-nums tracking-tight text-slate-900"
-          aria-live="off"
-        >
-          {formatHms(elapsedMs)}
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-3xl font-bold tabular-nums tracking-tight text-slate-900">
+            {formatHms(elapsedMs)}
+          </span>
+          {running ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={pause}
+              disabled={disabled}
+              className="gap-1.5"
+            >
+              <Pause className="h-4 w-4" />
+              Pause
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resume}
+              disabled={disabled || alreadySaved}
+              className="gap-1.5"
+            >
+              <Play className="h-4 w-4" />
+              Resume
+            </Button>
+          )}
         </div>
       </div>
 
       <p className="mt-1 text-sm text-muted-foreground">
         {disabled
-          ? "Load a case to start timing your review."
-          : running
-            ? `Timing “${caseId ?? "current case"}” — pause or save when the review is done.`
-            : `Paused at ${formatHms(elapsedMs)}. Resume or save this review.`}
+          ? "Load a case to start timing and grading."
+          : alreadySaved
+            ? "Saved. Load the next case to continue."
+            : running
+              ? "Stopwatch is running. Pause if you need to step away."
+              : "Paused. Resume when you return to the case."}
       </p>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {running ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={pause}
-            disabled={disabled}
-            className="gap-1.5"
-          >
-            <Pause className="h-4 w-4" />
-            Pause
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={resume}
-            disabled={disabled}
-            className="gap-1.5"
-          >
-            <Play className="h-4 w-4" />
-            Resume
-          </Button>
-        )}
+      {!disabled && (
+        <div className="mt-4 space-y-4">
+          {/* Pre-AI (or sole) reader answer */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-sm font-semibold text-slate-800">
+                {mode === "ai" ? "Your read — before AI" : "Your read"}
+              </span>
+              {mode === "ai" && preLocked && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                  <Lock className="h-3 w-3" />
+                  Locked
+                </span>
+              )}
+            </div>
+            <GradeConfidenceForm
+              idPrefix="pre"
+              grade={preGrade}
+              confidence={preConf}
+              onGradeChange={setPreGrade}
+              onConfidenceChange={setPreConf}
+              disabled={mode === "ai" && preLocked}
+            />
+            {mode === "ai" && !preLocked && (
+              <div className="mt-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!preComplete}
+                  onClick={() => setPreLocked(true)}
+                  className="gap-1.5"
+                >
+                  <Lock className="h-4 w-4" />
+                  Lock pre-AI read
+                </Button>
+                <span className="ml-2 text-xs text-slate-500">
+                  Locking reveals the AI analysis; the pre-AI answer can’t be changed afterwards.
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Post-AI reader answer (AI arm only, after the result is shown) */}
+          {mode === "ai" && preLocked && (
+            <div
+              className={`rounded-lg border p-4 ${
+                aiRevealed
+                  ? "border-slate-200 bg-white"
+                  : "border-dashed border-slate-200 bg-slate-50/40"
+              }`}
+            >
+              <div className="mb-3 text-sm font-semibold text-slate-800">
+                Your read — after AI
+              </div>
+              {aiRevealed ? (
+                <GradeConfidenceForm
+                  idPrefix="post"
+                  grade={postGrade}
+                  confidence={postConf}
+                  onGradeChange={setPostGrade}
+                  onConfidenceChange={setPostConf}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Run the AI analysis below, review it, then record your final read here.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button
-          variant="outline"
           size="sm"
-          onClick={reset}
-          disabled={disabled}
-          className="gap-1.5"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Reset
-        </Button>
-        <Button
-          size="sm"
-          onClick={saveTiming}
-          disabled={disabled || saving}
+          onClick={saveCase}
+          disabled={!canSave}
           className="gap-1.5 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
         >
           <Save className="h-4 w-4" />
-          {saving ? "Saving…" : "Save time to log"}
+          {saving ? "Saving…" : "Save assessment"}
         </Button>
         {savedAt && !saveError && (
           <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
@@ -327,33 +412,9 @@ export function CaseTimer({
             Saved at {savedAt}
           </span>
         )}
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="text-sm">
-          <span className="mb-1 block font-medium text-slate-700">
-            Reviewer
-          </span>
-          <input
-            type="text"
-            value={reviewer}
-            onChange={(e) => setReviewer(e.target.value)}
-            placeholder="Your name or initials"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block font-medium text-slate-700">
-            Notes (optional)
-          </span>
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anything worth recording for this case"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </label>
+        {saveHint && (
+          <span className="text-sm text-amber-700">{saveHint}</span>
+        )}
       </div>
 
       {saveError && (
@@ -366,14 +427,14 @@ export function CaseTimer({
         <div className="mt-5 border-t border-slate-100 pt-4">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <a
-              href="/api/timer-log?format=csv"
+              href="/api/study-log?format=csv"
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-blue-400 hover:text-blue-700"
             >
               <Download className="h-4 w-4" />
               Download log (CSV)
             </a>
             <a
-              href="/api/timer-log?summary=1&format=csv&group_by=final_grade"
+              href="/api/study-log?summary=1&format=csv&group_by=mode"
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-blue-400 hover:text-blue-700"
             >
               <Download className="h-4 w-4" />
@@ -395,7 +456,7 @@ export function CaseTimer({
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-3 py-2 font-semibold">Grade</th>
+                    <th className="px-3 py-2 font-semibold">Arm</th>
                     <th className="px-3 py-2 text-right font-semibold">Cases</th>
                     <th className="px-3 py-2 text-right font-semibold">Mean</th>
                     <th className="px-3 py-2 text-right font-semibold">Median</th>
@@ -405,6 +466,14 @@ export function CaseTimer({
                 <tbody>
                   {summary.map((row) => {
                     const isAll = row.group === "ALL";
+                    const label =
+                      row.group === "ai"
+                        ? "AI-assisted"
+                        : row.group === "control"
+                          ? "Control"
+                          : isAll
+                            ? "All cases"
+                            : row.group;
                     return (
                       <tr
                         key={row.group}
@@ -414,9 +483,7 @@ export function CaseTimer({
                             : "border-t border-slate-100"
                         }
                       >
-                        <td className="px-3 py-2">
-                          {isAll ? "All cases" : row.group}
-                        </td>
+                        <td className="px-3 py-2">{label}</td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {row.count}
                         </td>
@@ -451,8 +518,10 @@ export function CaseTimer({
                   <span className="font-mono font-semibold">
                     {entry.elapsed_hms}
                   </span>{" "}
-                  · {entry.case_id ?? "—"}
-                  {entry.final_grade ? ` · Grade ${entry.final_grade}` : ""}
+                  · {entry.case_id ?? "—"} ·{" "}
+                  {entry.mode === "ai" ? "AI" : "Control"}
+                  {entry.pre_grade ? ` · pre ${entry.pre_grade}` : ""}
+                  {entry.post_grade ? ` → post ${entry.post_grade}` : ""}
                   {entry.reviewer ? ` · ${entry.reviewer}` : ""}
                 </span>
                 <span className="text-xs text-slate-400">

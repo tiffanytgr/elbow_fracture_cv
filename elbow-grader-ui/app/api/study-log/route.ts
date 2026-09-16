@@ -2,36 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 
-// This route writes to the local filesystem, so it must run on the Node.js
-// runtime (not the Edge runtime) and never be statically cached.
+// Writes to the local filesystem → Node.js runtime, never cached.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Absolute path to the JSON Lines log file on the machine running this app.
- * Override with the TIMER_LOG_PATH env var (absolute path recommended).
- * Defaults to `<project>/logs/case-timings.jsonl`.
+ * Absolute path to the JSON Lines study log on the machine running this app.
+ * Override with STUDY_LOG_PATH; defaults to `<project>/logs/study-records.jsonl`.
  */
 function logFilePath(): string {
-  const configured = process.env.TIMER_LOG_PATH?.trim();
+  const configured = process.env.STUDY_LOG_PATH?.trim();
   if (configured) {
     return path.isAbsolute(configured)
       ? configured
       : path.join(process.cwd(), configured);
   }
-  return path.join(process.cwd(), "logs", "case-timings.jsonl");
+  return path.join(process.cwd(), "logs", "study-records.jsonl");
 }
 
-interface TimerLogPayload {
-  case_id?: string | null;
+interface StudyPayload {
   reviewer?: string | null;
+  mode?: string | null; // "ai" | "control"
+  case_id?: string | null;
+  input_mode?: string | null;
+  pre_grade?: string | null;
+  pre_confidence?: number | null;
+  post_grade?: string | null;
+  post_confidence?: number | null;
+  ai_grade?: string | null;
+  ai_confidence?: number | null;
   notes?: string | null;
   started_at?: string | null;
   ended_at?: string | null;
   elapsed_seconds?: number | null;
-  input_mode?: string | null;
-  final_grade?: string | null;
-  confidence?: number | null;
 }
 
 function secondsToHms(totalSeconds: number): string {
@@ -43,58 +46,8 @@ function secondsToHms(totalSeconds: number): string {
   return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
 }
 
-/**
- * POST /api/timer-log
- * Appends one case-timing record as a JSON line to the local log file.
- */
-export async function POST(req: NextRequest) {
-  try {
-    const body = (await req.json()) as TimerLogPayload;
-
-    const elapsedSeconds =
-      typeof body.elapsed_seconds === "number" && isFinite(body.elapsed_seconds)
-        ? Math.max(0, body.elapsed_seconds)
-        : null;
-
-    if (elapsedSeconds === null) {
-      return NextResponse.json(
-        { error: "elapsed_seconds is required and must be a number" },
-        { status: 400 },
-      );
-    }
-
-    const entry = {
-      case_id: body.case_id ?? null,
-      reviewer: body.reviewer?.trim() || null,
-      notes: body.notes?.trim() || null,
-      input_mode: body.input_mode ?? null,
-      final_grade: body.final_grade ?? null,
-      confidence:
-        typeof body.confidence === "number" ? body.confidence : null,
-      elapsed_seconds: Math.round(elapsedSeconds * 1000) / 1000,
-      elapsed_hms: secondsToHms(elapsedSeconds),
-      started_at: body.started_at ?? null,
-      ended_at: body.ended_at ?? new Date().toISOString(),
-      logged_at: new Date().toISOString(),
-    };
-
-    const filePath = logFilePath();
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.appendFile(filePath, JSON.stringify(entry) + "\n", "utf8");
-
-    return NextResponse.json({ ok: true, saved: entry, log_path: filePath });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json(
-      { error: "Failed to write timer log", detail: message },
-      { status: 500 },
-    );
-  }
-}
-
 type Entry = Record<string, unknown>;
 
-/** Read and parse the JSONL log; returns [] if the file does not exist yet. */
 async function readEntries(filePath: string): Promise<Entry[]> {
   try {
     const raw = await fs.readFile(filePath, "utf8");
@@ -116,7 +69,6 @@ async function readEntries(filePath: string): Promise<Entry[]> {
   }
 }
 
-/** Quote a CSV field per RFC 4180 when it contains a comma, quote, or newline. */
 function csvField(value: unknown): string {
   if (value === null || value === undefined) return "";
   const s = String(value);
@@ -131,11 +83,16 @@ const RAW_COLUMNS = [
   "logged_at",
   "started_at",
   "ended_at",
-  "case_id",
   "reviewer",
+  "mode",
+  "case_id",
   "input_mode",
-  "final_grade",
-  "confidence",
+  "pre_grade",
+  "pre_confidence",
+  "post_grade",
+  "post_confidence",
+  "ai_grade",
+  "ai_confidence",
   "elapsed_seconds",
   "elapsed_hms",
   "notes",
@@ -144,7 +101,9 @@ const RAW_COLUMNS = [
 function rawCsv(entries: Entry[]): string {
   const rows: (string | number | null | undefined)[][] = [
     [...RAW_COLUMNS],
-    ...entries.map((e) => RAW_COLUMNS.map((c) => e[c] as string | number | null)),
+    ...entries.map((e) =>
+      RAW_COLUMNS.map((c) => e[c] as string | number | null),
+    ),
   ];
   return toCsv(rows);
 }
@@ -152,11 +111,11 @@ function rawCsv(entries: Entry[]): string {
 interface GroupStats {
   group: string;
   count: number;
-  total_seconds: number;
   mean_seconds: number;
   median_seconds: number;
   min_seconds: number;
   max_seconds: number;
+  total_seconds: number;
 }
 
 function statsFor(group: string, seconds: number[]): GroupStats {
@@ -173,15 +132,14 @@ function statsFor(group: string, seconds: number[]): GroupStats {
   return {
     group,
     count: n,
-    total_seconds: round1(total),
     mean_seconds: n ? round1(total / n) : 0,
     median_seconds: round1(median),
     min_seconds: n ? round1(sorted[0]) : 0,
     max_seconds: n ? round1(sorted[n - 1]) : 0,
+    total_seconds: round1(total),
   };
 }
 
-/** Aggregate stats overall and grouped by the given field (default final_grade). */
 function summarize(entries: Entry[], groupBy: string): GroupStats[] {
   const secondsOf = (e: Entry) =>
     typeof e.elapsed_seconds === "number" ? e.elapsed_seconds : NaN;
@@ -205,11 +163,11 @@ function summarize(entries: Entry[], groupBy: string): GroupStats[] {
 const SUMMARY_COLUMNS: (keyof GroupStats)[] = [
   "group",
   "count",
-  "total_seconds",
   "mean_seconds",
   "median_seconds",
   "min_seconds",
   "max_seconds",
+  "total_seconds",
 ];
 
 function summaryCsv(stats: GroupStats[], groupLabel: string): string {
@@ -232,12 +190,82 @@ function csvResponse(body: string, filename: string): NextResponse {
 }
 
 /**
- * GET /api/timer-log
+ * POST /api/study-log
+ * Appends one study record as a JSON line to the local log file.
+ * Requires mode and elapsed_seconds; a pre-AI grade is required for every arm.
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const body = (await req.json()) as StudyPayload;
+
+    const elapsedSeconds =
+      typeof body.elapsed_seconds === "number" && isFinite(body.elapsed_seconds)
+        ? Math.max(0, body.elapsed_seconds)
+        : null;
+
+    if (elapsedSeconds === null) {
+      return NextResponse.json(
+        { error: "elapsed_seconds is required and must be a number" },
+        { status: 400 },
+      );
+    }
+    if (body.mode !== "ai" && body.mode !== "control") {
+      return NextResponse.json(
+        { error: "mode is required and must be 'ai' or 'control'" },
+        { status: 400 },
+      );
+    }
+    if (!body.pre_grade) {
+      return NextResponse.json(
+        { error: "pre_grade is required" },
+        { status: 400 },
+      );
+    }
+
+    const num = (v: number | null | undefined) =>
+      typeof v === "number" ? v : null;
+
+    const entry = {
+      reviewer: body.reviewer?.trim() || null,
+      mode: body.mode,
+      case_id: body.case_id ?? null,
+      input_mode: body.input_mode ?? null,
+      pre_grade: body.pre_grade,
+      pre_confidence: num(body.pre_confidence),
+      // Post-AI answer only applies to the AI arm.
+      post_grade: body.mode === "ai" ? body.post_grade ?? null : null,
+      post_confidence: body.mode === "ai" ? num(body.post_confidence) : null,
+      ai_grade: body.mode === "ai" ? body.ai_grade ?? null : null,
+      ai_confidence: body.mode === "ai" ? num(body.ai_confidence) : null,
+      notes: body.notes?.trim() || null,
+      elapsed_seconds: Math.round(elapsedSeconds * 1000) / 1000,
+      elapsed_hms: secondsToHms(elapsedSeconds),
+      started_at: body.started_at ?? null,
+      ended_at: body.ended_at ?? new Date().toISOString(),
+      logged_at: new Date().toISOString(),
+    };
+
+    const filePath = logFilePath();
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.appendFile(filePath, JSON.stringify(entry) + "\n", "utf8");
+
+    return NextResponse.json({ ok: true, saved: entry, log_path: filePath });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: "Failed to write study log", detail: message },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * GET /api/study-log
  *   ?limit=10                 → recent records as JSON (default)
  *   ?format=csv               → all records as a CSV download
- *   ?summary=1[&group_by=…]   → grouped stats as JSON
+ *   ?summary=1[&group_by=…]   → grouped timing stats as JSON
  *   ?summary=1&format=csv     → grouped stats as a CSV download
- * group_by defaults to final_grade; reviewer / input_mode are also useful.
+ * group_by defaults to mode (study arm); reviewer / pre_grade / input_mode also work.
  */
 export async function GET(req: NextRequest) {
   const filePath = logFilePath();
@@ -245,7 +273,7 @@ export async function GET(req: NextRequest) {
   const format = params.get("format");
   const wantSummary =
     params.get("summary") === "1" || params.get("summary") === "true";
-  const groupBy = params.get("group_by") || "final_grade";
+  const groupBy = params.get("group_by") || "mode";
 
   try {
     const entries = await readEntries(filePath);
@@ -253,10 +281,7 @@ export async function GET(req: NextRequest) {
     if (wantSummary) {
       const stats = summarize(entries, groupBy);
       if (format === "csv") {
-        return csvResponse(
-          summaryCsv(stats, groupBy),
-          "case-timings-summary.csv",
-        );
+        return csvResponse(summaryCsv(stats, groupBy), "study-summary.csv");
       }
       return NextResponse.json({
         log_path: filePath,
@@ -267,7 +292,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (format === "csv") {
-      return csvResponse(rawCsv(entries), "case-timings.csv");
+      return csvResponse(rawCsv(entries), "study-records.csv");
     }
 
     const limit = Math.min(
@@ -282,7 +307,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Failed to read timer log", detail: message },
+      { error: "Failed to read study log", detail: message },
       { status: 500 },
     );
   }

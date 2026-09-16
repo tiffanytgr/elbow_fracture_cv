@@ -36,42 +36,56 @@ npm start
 
 | Variable | Default | Description |
 |---|---|---|
-| `BACKEND_URL` | `http://localhost:8000` | FastAPI service URL |
-| `TIMER_LOG_PATH` | `logs/case-timings.jsonl` | Where case review timings are written on the local device (absolute path recommended) |
+| `BACKEND_URL` | `http://localhost:8000` | FastAPI service URL (only needed for the AI arm) |
+| `STUDY_LOG_PATH` | `logs/study-records.jsonl` | Where reader-study records are written on the local device (absolute path recommended) |
 
 Set `BACKEND_URL` in `.env.local` to point at a remote backend.
 
-## Case review timer
+## Reader study: arms, timer, and answer capture
 
-The main page includes a **Case Review Timer** that measures how long a reviewer
-spends on each case. The timer auto-starts and resets whenever a new case is
-loaded (demo selection or upload), and supports pause/resume/reset. Clicking
-**Save time to log** appends one record to a JSON Lines file **on the machine
-running the app** (the Next.js server writes it via `POST /api/timer-log`), so
-it works for a locally-hosted deployment on a remote laptop.
+The page runs as a reader-study tool with two arms, chosen per case in the
+**Study Session** bar (reviewer name + arm). The arm is **locked once a case is
+loaded** and unlocks after the case is saved, so it can't be flipped mid-case.
+
+- **AI-assisted arm** — the reader records a grade + confidence **before** the AI
+  is shown, locks it, runs the AI analysis, reviews it (Grad-CAM, Baumann, AHL,
+  bone profile), then records a **post-AI** grade + confidence. The Analyse
+  button stays disabled until the pre-AI read is locked, and the AI result is
+  only revealed afterwards.
+- **Control arm** — no AI at all: the Sidebar, Analyse step, and results are
+  hidden, so the reader sees only the AP/LAT images and records **one** grade +
+  confidence per case.
+
+Both arms share a per-case **stopwatch** that auto-starts when a case loads and
+has a **Pause** button for stepping away. **Save assessment** appends one record
+to a JSON Lines file **on the machine running the app** (written server side via
+`POST /api/study-log`), so it works for a locally-hosted deployment on a remote
+laptop. Grades use the AI label space (`Normal`, `Grade 1`, `Grade 2a`,
+`Grade 2b`, `Grade 3`) with a 1–5 confidence scale.
 
 Each line is a JSON object, e.g.:
 
 ```json
-{"case_id":"a145","reviewer":"TT","notes":null,"input_mode":"demo","final_grade":"2a","confidence":0.83,"elapsed_seconds":42.6,"elapsed_hms":"00:00:43","started_at":"2026-09-10T…","ended_at":"2026-09-10T…","logged_at":"2026-09-10T…"}
+{"reviewer":"TT","mode":"ai","case_id":"a145","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_grade":"Grade 2b","ai_confidence":0.81,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
 ```
 
-The default location is `elbow-grader-ui/logs/case-timings.jsonl` (git-ignored).
-Override it with `TIMER_LOG_PATH`.
+In control records `post_grade`, `post_confidence`, `ai_grade` and
+`ai_confidence` are `null`. The default location is
+`elbow-grader-ui/logs/study-records.jsonl` (git-ignored); override with
+`STUDY_LOG_PATH`.
 
-`GET /api/timer-log` reads the log back:
+`GET /api/study-log` reads the log back:
 
 | Query | Returns |
 |---|---|
 | `?limit=N` | N most recent records as JSON (shown under "Recently logged") |
 | `?format=csv` | Every record as a CSV download |
-| `?summary=1` | Grouped stats (count, mean/median/min/max/total seconds) as JSON |
+| `?summary=1` | Grouped timing stats (count, mean/median/min/max/total seconds) as JSON |
 | `?summary=1&format=csv` | The same grouped stats as a CSV download |
-| `&group_by=…` | Grouping field for the summary — `final_grade` (default), `reviewer`, or `input_mode` |
+| `&group_by=…` | Grouping field for the summary — `mode` (default), `reviewer`, `pre_grade`, or `input_mode` |
 
 The summary always includes an `ALL` row alongside the per-group rows. The UI
-exposes **Download log (CSV)**, **Summary (CSV)**, and an inline summary table
-under "Recently logged".
+exposes **Download log (CSV)**, **Summary (CSV)**, and an inline summary table.
 
 ## Architecture
 

@@ -1,12 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { Grid2X2, Images, Loader2, Play, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  FlaskConical,
+  Grid2X2,
+  Images,
+  Loader2,
+  Play,
+  ShieldCheck,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sidebar } from "@/components/Sidebar";
-import { CaseTimer } from "@/components/CaseTimer";
+import { StudyPanel } from "@/components/StudyPanel";
+import { CaseImageBoard } from "@/components/CaseImageBoard";
 import { FileUploader } from "@/components/FileUploader";
 import {
   DEMO_CASES,
@@ -21,12 +31,16 @@ import { GeometricTab } from "@/components/tabs/GeometricTab";
 import { CorticalWidthTab } from "@/components/tabs/CorticalWidthTab";
 import { ReportGenerator } from "@/components/ReportGenerator";
 import type { GraderConfig, PredictResponse } from "@/lib/types";
+import type { StudyMode } from "@/lib/studyTypes";
 
 const DEFAULT_CONFIG: GraderConfig = {
   confidenceThreshold: 0.7,
   runFullLatAlignment: true,
   runSam2: true,
 };
+
+const REVIEWER_STORAGE_KEY = "elbow-grader-reviewer";
+const MODE_STORAGE_KEY = "elbow-grader-mode";
 
 function StepBadge({ n, done }: { n: number; done: boolean }) {
   return (
@@ -60,6 +74,12 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Study-session state.
+  const [reviewer, setReviewer] = useState("");
+  const [mode, setMode] = useState<StudyMode>("ai");
+  const [preLocked, setPreLocked] = useState(false);
+  const [savedCaseKey, setSavedCaseKey] = useState<string | null>(null);
+
   const apFile = inputMode === "upload" ? uploadedApFile : demoApFile;
   const latFile = inputMode === "upload" ? uploadedLatFile : demoLatFile;
   const canRun = apFile !== null || latFile !== null;
@@ -68,9 +88,7 @@ export default function HomePage() {
   }:${configVersion}`;
   const resultIsStale = result !== null && currentInputKey !== resultInputKey;
 
-  // Identity of the loaded case, used to drive the review timer. The label is
-  // shown to the reviewer; the key changes whenever a new case is loaded so the
-  // timer auto-resets and restarts.
+  // Identity of the loaded case, used to drive the timer and per-case reset.
   const caseId =
     inputMode === "demo"
       ? selectedDemoId
@@ -82,6 +100,54 @@ export default function HomePage() {
     : inputMode === "demo"
       ? `demo:${selectedDemoId}:${demoVersion}`
       : `upload:${uploadVersion}`;
+
+  const isControl = mode === "control";
+  // A case is "in progress" once loaded and until it has been saved; the study
+  // arm is locked during this window so it can't be flipped mid-case.
+  const caseInProgress = caseKey !== null && caseKey !== savedCaseKey;
+  const aiRevealed = !isControl && result !== null && !resultIsStale;
+
+  // Restore reviewer + arm from a previous session.
+  useEffect(() => {
+    try {
+      const storedReviewer = window.localStorage.getItem(REVIEWER_STORAGE_KEY);
+      if (storedReviewer) setReviewer(storedReviewer);
+      const storedMode = window.localStorage.getItem(MODE_STORAGE_KEY);
+      if (storedMode === "ai" || storedMode === "control") setMode(storedMode);
+    } catch {
+      /* localStorage may be unavailable */
+    }
+  }, []);
+
+  // Clear any AI result whenever a new case loads or the arm changes, so the
+  // post-AI read always waits for a fresh analysis of the current case.
+  useEffect(() => {
+    setResult(null);
+    setError(null);
+  }, [caseKey, mode]);
+
+  function persistReviewer(next: string) {
+    setReviewer(next);
+    try {
+      window.localStorage.setItem(REVIEWER_STORAGE_KEY, next.trim());
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function changeMode(next: StudyMode) {
+    if (caseInProgress || next === mode) return;
+    setMode(next);
+    try {
+      window.localStorage.setItem(MODE_STORAGE_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const handleSaved = useCallback((key: string) => {
+    setSavedCaseKey(key);
+  }, []);
 
   function changeInputMode(mode: "upload" | "demo") {
     if (loading || loadingDemoId !== null || mode === inputMode) return;
@@ -135,7 +201,7 @@ export default function HomePage() {
   }
 
   async function handleRun() {
-    if (!canRun || loadingDemoId !== null) return;
+    if (!canRun || loadingDemoId !== null || isControl || !preLocked) return;
     const submittedInputKey = currentInputKey;
     const submittedHasLat = latFile !== null;
     setLoading(true);
@@ -173,21 +239,23 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] lg:flex">
-      {/* Sidebar */}
-      <Sidebar
-        modelStatus={result?.model_status ?? null}
-        config={config}
-        result={result}
-        onConfigChange={(nextConfig) => {
-          setConfig(nextConfig);
-          setConfigVersion((version) => version + 1);
-        }}
-        device={
-          result?.config_snapshot
-            ? String((result.config_snapshot as Record<string, unknown>)["device"] ?? "")
-            : undefined
-        }
-      />
+      {/* Sidebar — hidden in the control arm so no AI settings/telemetry show */}
+      {!isControl && (
+        <Sidebar
+          modelStatus={result?.model_status ?? null}
+          config={config}
+          result={result}
+          onConfigChange={(nextConfig) => {
+            setConfig(nextConfig);
+            setConfigVersion((version) => version + 1);
+          }}
+          device={
+            result?.config_snapshot
+              ? String((result.config_snapshot as Record<string, unknown>)["device"] ?? "")
+              : undefined
+          }
+        />
+      )}
 
       {/* Main content */}
       <main className="min-w-0 flex-1 space-y-4 p-4 sm:p-6 lg:p-5 xl:p-6">
@@ -206,7 +274,7 @@ export default function HomePage() {
               Paediatric Elbow Fracture Grader
             </h1>
             <p className="mt-2 text-sm font-medium text-white/90 sm:text-base">
-              Automated Gartland classification for supracondylar humerus fractures
+              Gartland classification reader study — AI-assisted and control arms
             </p>
             <div className="mt-4">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/20 bg-blue-500/60 px-3 py-1.5 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
@@ -217,6 +285,72 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Study session — reviewer + arm, locked once a case is in progress */}
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 text-blue-600" />
+            <h2 className="text-base font-semibold">Study Session</h2>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="text-sm">
+              <span className="mb-1 block font-medium text-slate-700">
+                Reviewer
+              </span>
+              <input
+                type="text"
+                value={reviewer}
+                onChange={(e) => persistReviewer(e.target.value)}
+                placeholder="Your name or initials"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </label>
+            <div className="text-sm">
+              <span className="mb-1 block font-medium text-slate-700">
+                Study arm
+              </span>
+              <div
+                className="grid grid-cols-2 gap-2"
+                role="group"
+                aria-label="Study arm"
+              >
+                <button
+                  type="button"
+                  onClick={() => changeMode("ai")}
+                  disabled={caseInProgress}
+                  aria-pressed={mode === "ai"}
+                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    mode === "ai"
+                      ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                      : "border-slate-300 bg-white text-slate-700 hover:border-blue-300"
+                  }`}
+                >
+                  AI-assisted
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeMode("control")}
+                  disabled={caseInProgress}
+                  aria-pressed={mode === "control"}
+                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    mode === "control"
+                      ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                      : "border-slate-300 bg-white text-slate-700 hover:border-blue-300"
+                  }`}
+                >
+                  Control (no AI)
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {caseInProgress
+                  ? "Arm is locked while a case is in progress. Save the case to change it."
+                  : isControl
+                    ? "Control arm: images only, no AI output. One read per case."
+                    : "AI-assisted arm: record your read before and after seeing the AI."}
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Step 1 — Choose images */}
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
@@ -225,7 +359,7 @@ export default function HomePage() {
           </div>
           <p className="mt-1 pl-8 text-sm text-muted-foreground">
             Upload your own AP/LAT images, or select a Grade 2a or Grade 2b
-            example to explore the analysis workflow.
+            example case.
           </p>
 
           <div className="pl-8">
@@ -246,7 +380,7 @@ export default function HomePage() {
                 }`}
               >
                 <Images className="h-4 w-4" />
-                Try a demo case
+                Example case
               </button>
               <button
                 type="button"
@@ -294,16 +428,16 @@ export default function HomePage() {
                     <Sparkles className="mt-0.5 h-5 w-5 text-blue-600" />
                     <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Select a demo example
+                      Select an example case
                     </p>
                     <p className="text-xs text-slate-500">
-                      Explore curated cases to see how the model performs.
+                      Curated Grade 2a / 2b studies.
                     </p>
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">
                     <Grid2X2 className="h-3.5 w-3.5" />
-                    {DEMO_CASES.length} demo cases
+                    {DEMO_CASES.length} cases
                   </span>
                 </div>
                 <DemoCaseSelector
@@ -317,59 +451,78 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Case review timer */}
-        <CaseTimer
+        {/* Review images — shown for the loaded case (both arms) */}
+        {canRun && (
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Images className="h-5 w-5 text-blue-600" />
+              <h2 className="text-base font-semibold">Review Images</h2>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Click either view to enlarge.
+            </p>
+            <div className="mt-4">
+              <CaseImageBoard apFile={apFile} latFile={latFile} />
+            </div>
+          </section>
+        )}
+
+        {/* Reader assessment — timer + pre/post reads + save */}
+        <StudyPanel
           caseKey={caseKey}
           caseId={caseId}
           inputMode={inputMode}
-          finalGrade={result && !resultIsStale ? result.final_grade : null}
-          confidence={result && !resultIsStale ? result.confidence : null}
+          reviewer={reviewer}
+          mode={mode}
+          aiRevealed={aiRevealed}
+          aiGrade={aiRevealed ? result?.final_grade ?? null : null}
+          aiConfidence={aiRevealed ? result?.confidence ?? null : null}
+          onPreLockedChange={setPreLocked}
+          onSaved={handleSaved}
         />
 
-        {/* Step 2 — Analyse */}
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <StepBadge n={2} done={result !== null} />
-            <h2 className="text-base font-semibold">Run Analysis</h2>
-          </div>
+        {/* Step 2 — Analyse (AI arm only) */}
+        {!isControl && (
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <StepBadge n={2} done={result !== null} />
+              <h2 className="text-base font-semibold">Run AI Analysis</h2>
+            </div>
 
-          <div className="flex items-center gap-4 pl-8">
-            <Button
-              size="lg"
-              onClick={handleRun}
-              disabled={!canRun || loading || loadingDemoId !== null}
-              className="gap-2 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Play className="w-4 h-4" />
-              )}
-              {loading ? "Analysing…" : "Analyse X-rays"}
-            </Button>
-            {resultIsStale && !loading && (
-              <p
-                className="text-sm font-medium text-amber-700"
-                role="status"
-                aria-live="polite"
+            <div className="flex flex-wrap items-center gap-4 pl-8">
+              <Button
+                size="lg"
+                onClick={handleRun}
+                disabled={!canRun || loading || loadingDemoId !== null || !preLocked}
+                className="gap-2 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
               >
-                New images or settings selected. Results below are from the previous analysis.
-              </p>
-            )}
-            {!canRun && (
-              <p className="text-sm text-muted-foreground">
-                {inputMode === "demo"
-                  ? "Select a demo case to enable analysis."
-                  : "Upload at least one X-ray to enable analysis."}
-              </p>
-            )}
-            {loading && (
-              <p className="text-sm text-muted-foreground animate-pulse">
-                First run loads AI models — allow 30–60 s…
-              </p>
-            )}
-          </div>
-        </section>
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+                {loading ? "Analysing…" : "Analyse X-rays"}
+              </Button>
+              {!canRun && (
+                <p className="text-sm text-muted-foreground">
+                  {inputMode === "demo"
+                    ? "Select a case to enable analysis."
+                    : "Upload at least one X-ray to enable analysis."}
+                </p>
+              )}
+              {canRun && !preLocked && (
+                <p className="text-sm text-amber-700">
+                  Lock your pre-AI read above before running the analysis.
+                </p>
+              )}
+              {loading && (
+                <p className="text-sm text-muted-foreground animate-pulse">
+                  First run loads AI models — allow 30–60 s…
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Error */}
         {error && (
@@ -378,13 +531,13 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Step 3 — Results */}
-        {result && (
+        {/* Step 3 — Results (AI arm only) */}
+        {!isControl && result && (
           <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <StepBadge n={3} done={true} />
-                <h2 className="text-base font-semibold">Review Results</h2>
+                <h2 className="text-base font-semibold">Review AI Results</h2>
               </div>
               <ReportGenerator
                 result={result}
@@ -394,7 +547,8 @@ export default function HomePage() {
               />
             </div>
             <p className="pl-8 text-sm text-muted-foreground">
-              AI analysis complete. Please review the classification and supporting assessments.
+              AI analysis complete. Review it, then record your post-AI read in the
+              assessment panel above.
             </p>
 
             <div className="pl-8 space-y-4">
