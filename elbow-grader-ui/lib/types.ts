@@ -51,6 +51,7 @@ export interface RegressorBaumannData {
 }
 
 export interface PredictResponse {
+  processing_time_seconds: number | null;
   final_grade: string | null;
   cnn_grade: string | null;
   geometric_grade: string | null;
