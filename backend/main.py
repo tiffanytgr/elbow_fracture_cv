@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import base64
 import io
+import json
+import logging
 import sys
 import tempfile
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -33,6 +37,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Prediction timing log (local file, one JSON line per request) ──────
+_LOG_DIR = _ROOT / "logs"
+_LOG_DIR.mkdir(exist_ok=True)
+_LOG_FILE = _LOG_DIR / "predictions.log"
+
+_prediction_logger = logging.getLogger("elbow_grader.predictions")
+_prediction_logger.setLevel(logging.INFO)
+if not _prediction_logger.handlers:
+    _handler = logging.FileHandler(_LOG_FILE)
+    _handler.setFormatter(logging.Formatter("%(message)s"))
+    _prediction_logger.addHandler(_handler)
+    _prediction_logger.propagate = False
+
+
+def _log_prediction(*, ap_filename: Optional[str], lat_filename: Optional[str],
+                     processing_time_seconds: float, final_grade: Optional[str],
+                     grade_source: Optional[str]) -> None:
+    """Append one JSON line to logs/predictions.log, keyed by uploaded file name(s)."""
+    _prediction_logger.info(json.dumps({
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "ap_file": ap_filename,
+        "lat_file": lat_filename,
+        "processing_time_seconds": processing_time_seconds,
+        "final_grade": final_grade,
+        "grade_source": grade_source,
+    }))
+
 
 # ── Singleton grader (loaded once, weights stay warm) ──────────────────
 _grader: Optional[ElbowGrader] = None
@@ -131,7 +163,9 @@ async def predict(
             temp_files.append(f.name)
             lat_path = f.name
 
+        start_time = time.perf_counter()
         result = grader.predict(ap_image=ap_path, lat_image=lat_path)
+        processing_time_seconds = round(time.perf_counter() - start_time, 3)
 
     finally:
         for t in temp_files:
@@ -139,6 +173,14 @@ async def predict(
                 Path(t).unlink(missing_ok=True)
             except Exception:
                 pass
+
+    _log_prediction(
+        ap_filename=ap_file.filename if ap_file is not None else None,
+        lat_filename=lat_file.filename if lat_file is not None else None,
+        processing_time_seconds=processing_time_seconds,
+        final_grade=result.final_grade,
+        grade_source=result.grade_source,
+    )
 
     r = result._r
 
@@ -211,6 +253,7 @@ async def predict(
             pass
 
     return {
+        "processing_time_seconds": processing_time_seconds,
         "final_grade": result.final_grade,
         "cnn_grade": result.cnn_grade,
         "geometric_grade": result.geometric_grade,

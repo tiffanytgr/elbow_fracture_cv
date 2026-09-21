@@ -34,7 +34,7 @@ export function SummaryTab({ result }: SummaryTabProps) {
   return (
     <div className="space-y-6 py-4">
       {/* Grade + confidence row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <MetricCard
           label="Gartland Grade"
           value={grade}
@@ -52,6 +52,14 @@ export function SummaryTab({ result }: SummaryTabProps) {
           label="Agreement"
           value={isDiscordant ? "Disagree ⚠️" : "Agree ✓"}
           colorClass={isDiscordant ? "border-amber-200 bg-amber-50" : undefined}
+        />
+        <MetricCard
+          label="Processing Time"
+          value={
+            result.processing_time_seconds != null
+              ? `${result.processing_time_seconds.toFixed(2)}s`
+              : "n/a"
+          }
         />
       </div>
 
