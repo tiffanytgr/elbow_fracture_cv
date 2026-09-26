@@ -9,12 +9,16 @@ import {
   Lock,
   Pause,
   Play,
-  Save,
+  Send,
   Timer as TimerIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { GradeConfidenceForm } from "@/components/GradeConfidenceForm";
+import {
+  ConfidencePicker,
+  GradeConfidenceForm,
+  GradePicker,
+} from "@/components/GradeConfidenceForm";
 import type { ConfidenceLevel, StudyMode } from "@/lib/studyTypes";
 
 interface RecentEntry {
@@ -23,6 +27,7 @@ interface RecentEntry {
   case_id: string | null;
   pre_grade: string | null;
   post_grade: string | null;
+  decision_time_seconds: number | null;
   elapsed_hms: string;
   logged_at: string;
 }
@@ -33,18 +38,25 @@ interface SummaryRow {
   mean_seconds: number;
   median_seconds: number;
   total_seconds: number;
+  mean_decision_seconds: number | null;
+  median_decision_seconds: number | null;
 }
 
 interface StudyPanelProps {
   caseKey: string | null;
+  /** Case identifier, built from the X-ray file path(s). */
   caseId: string | null;
+  apPath: string | null;
+  latPath: string | null;
   inputMode: string;
   reviewer: string;
   mode: StudyMode;
   /** True once the AI result is visible on the page (AI arm only). */
   aiRevealed: boolean;
-  /** The AI's own final grade / confidence, stored alongside the reader answers. */
-  aiGrade?: string | null;
+  /** The AI's outputs, stored alongside the reader answers. */
+  aiGartlandGrade?: string | null;
+  aiCnnGrade?: string | null;
+  aiGeometricGrade?: string | null;
   aiConfidence?: number | null;
   /** Fires whenever the pre-AI answer lock state changes (gates Analyse + reveal). */
   onPreLockedChange: (locked: boolean) => void;
@@ -71,11 +83,15 @@ function formatSeconds(totalSeconds: number): string {
 export function StudyPanel({
   caseKey,
   caseId,
+  apPath,
+  latPath,
   inputMode,
   reviewer,
   mode,
   aiRevealed,
-  aiGrade = null,
+  aiGartlandGrade = null,
+  aiCnnGrade = null,
+  aiGeometricGrade = null,
   aiConfidence = null,
   onPreLockedChange,
   onSaved,
@@ -88,6 +104,12 @@ export function StudyPanel({
   const [preLocked, setPreLocked] = useState(false);
   const [postGrade, setPostGrade] = useState<string | null>(null);
   const [postConf, setPostConf] = useState<ConfidenceLevel | null>(null);
+  const [comments, setComments] = useState("");
+
+  // Two-step submission: (1) the decision grade, which stops the decision
+  // clock; (2) confidence + follow-up questions, which saves the case.
+  const [gradeSubmitted, setGradeSubmitted] = useState(false);
+  const [decisionSeconds, setDecisionSeconds] = useState<number | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -100,6 +122,17 @@ export function StudyPanel({
   const accumulatedRef = useRef(0);
   const segmentStartRef = useRef<number | null>(null);
   const startedAtRef = useRef<string | null>(null);
+  // Stopwatch reading (ms) and wall-clock time when the decision window opened:
+  // AI results shown (AI arm) or case loaded (control arm).
+  const decisionStartMsRef = useRef<number | null>(null);
+  const decisionStartedAtRef = useRef<string | null>(null);
+  const gradeSubmittedAtRef = useRef<string | null>(null);
+
+  const isAi = mode === "ai";
+  // The grade the decision time is measured against.
+  const decisionGrade = isAi ? postGrade : preGrade;
+  const decisionConf = isAi ? postConf : preConf;
+  const setDecisionConf = isAi ? setPostConf : setPreConf;
 
   // Keep the parent informed of the pre-AI lock so it can gate analysis/reveal.
   useEffect(() => {
@@ -139,6 +172,12 @@ export function StudyPanel({
     if (showSummary) loadSummary();
   }, [showSummary, loadSummary]);
 
+  function currentElapsedMs(): number {
+    const seg =
+      segmentStartRef.current !== null ? Date.now() - segmentStartRef.current : 0;
+    return accumulatedRef.current + seg;
+  }
+
   // Auto reset & start whenever a new case is loaded; clear all answers.
   useEffect(() => {
     if (!caseKey) {
@@ -154,27 +193,48 @@ export function StudyPanel({
       setElapsedMs(0);
       setRunning(true);
     }
+    // Control arm: the decision window opens as soon as the case loads.
+    const openNow = caseKey !== null && mode === "control";
+    decisionStartMsRef.current = openNow ? 0 : null;
+    decisionStartedAtRef.current = openNow ? startedAtRef.current : null;
+    gradeSubmittedAtRef.current = null;
     setPreGrade(null);
     setPreConf(null);
     setPreLocked(false);
     setPostGrade(null);
     setPostConf(null);
+    setComments("");
+    setGradeSubmitted(false);
+    setDecisionSeconds(null);
     setSavedAt(null);
     setSaveError(null);
+    // The arm can only change while no case is in progress, so `mode` is read
+    // but deliberately not a trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseKey]);
+
+  // AI arm: the decision window opens when the AI result is shown. A re-run
+  // before the grade is submitted restarts it from the latest reveal.
+  useEffect(() => {
+    if (!isAi || gradeSubmitted) return;
+    if (aiRevealed) {
+      decisionStartMsRef.current = currentElapsedMs();
+      decisionStartedAtRef.current = new Date().toISOString();
+    } else {
+      decisionStartMsRef.current = null;
+      decisionStartedAtRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiRevealed, isAi]);
 
   // Tick while running.
   useEffect(() => {
     if (!running) return;
     const id = window.setInterval(() => {
-      const base = accumulatedRef.current;
-      const seg =
-        segmentStartRef.current !== null
-          ? Date.now() - segmentStartRef.current
-          : 0;
-      setElapsedMs(base + seg);
+      setElapsedMs(currentElapsedMs());
     }, 250);
     return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 
   function pause() {
@@ -194,8 +254,18 @@ export function StudyPanel({
     setRunning(true);
   }
 
+  /** Submit 1: lock the decision grade and record the decision time. */
+  function submitGrade() {
+    if (!canSubmitGrade || decisionStartMsRef.current === null) return;
+    const seconds = (currentElapsedMs() - decisionStartMsRef.current) / 1000;
+    gradeSubmittedAtRef.current = new Date().toISOString();
+    setDecisionSeconds(Math.max(0, seconds));
+    setGradeSubmitted(true);
+  }
+
+  /** Submit 2: confidence + follow-up answers; writes the case to the log. */
   async function saveCase() {
-    if (!caseKey) return;
+    if (!caseKey || !canSave) return;
     setSaving(true);
     setSaveError(null);
 
@@ -216,13 +286,21 @@ export function StudyPanel({
           reviewer: reviewer.trim() || null,
           mode,
           case_id: caseId,
+          ap_path: apPath,
+          lat_path: latPath,
           input_mode: inputMode,
           pre_grade: preGrade,
           pre_confidence: preConf,
-          post_grade: mode === "ai" ? postGrade : null,
-          post_confidence: mode === "ai" ? postConf : null,
-          ai_grade: mode === "ai" ? aiGrade : null,
-          ai_confidence: mode === "ai" ? aiConfidence : null,
+          post_grade: isAi ? postGrade : null,
+          post_confidence: isAi ? postConf : null,
+          ai_gartland_grade: isAi ? aiGartlandGrade : null,
+          ai_cnn_grade: isAi ? aiCnnGrade : null,
+          ai_geometric_grade: isAi ? aiGeometricGrade : null,
+          ai_confidence: isAi ? aiConfidence : null,
+          notes: comments,
+          decision_time_seconds: decisionSeconds,
+          decision_started_at: decisionStartedAtRef.current,
+          grade_submitted_at: gradeSubmittedAtRef.current,
           elapsed_seconds: elapsedSeconds,
           started_at: startedAtRef.current,
           ended_at: new Date().toISOString(),
@@ -248,29 +326,40 @@ export function StudyPanel({
   const disabled = !caseKey;
   const alreadySaved = savedAt !== null;
 
-  // Gate the save button per arm.
   const preComplete = preGrade !== null && preConf !== null;
-  const postComplete = postGrade !== null && postConf !== null;
+  const canSubmitGrade =
+    !disabled &&
+    !gradeSubmitted &&
+    decisionGrade !== null &&
+    (!isAi || (preLocked && aiRevealed));
   const canSave =
     !disabled &&
     !saving &&
     !alreadySaved &&
-    (mode === "control"
-      ? preComplete
-      : preLocked && aiRevealed && postComplete);
+    gradeSubmitted &&
+    decisionConf !== null &&
+    (!isAi || aiRevealed);
 
-  let saveHint: string | null = null;
+  let hint: string | null = null;
   if (!disabled && !alreadySaved) {
-    if (mode === "control" && !preComplete) {
-      saveHint = "Enter a grade and confidence to save.";
-    } else if (mode === "ai" && !preLocked) {
-      saveHint = "Lock your pre-AI read first.";
-    } else if (mode === "ai" && !aiRevealed) {
-      saveHint = "Run the AI analysis, then enter your post-AI read.";
-    } else if (mode === "ai" && !postComplete) {
-      saveHint = "Enter your post-AI grade and confidence to save.";
+    if (isAi && !preLocked) {
+      hint = "Lock your pre-AI read first.";
+    } else if (isAi && !aiRevealed) {
+      hint = gradeSubmitted
+        ? "AI result is out of date — re-run the analysis to submit."
+        : "Run the AI analysis, then choose your grade.";
+    } else if (!gradeSubmitted) {
+      hint = decisionGrade
+        ? "Submit your grade to record your decision time."
+        : "Choose a Gartland grade.";
+    } else if (!decisionConf) {
+      hint = "Rate your confidence, then submit the assessment.";
     }
   }
+
+  const decisionTimeNote = isAi
+    ? "Decision time runs from when the AI results appear until you submit your grade."
+    : "Decision time runs from when the case loads until you submit your grade.";
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -280,7 +369,7 @@ export function StudyPanel({
           <h2 className="text-base font-semibold">
             Reader Assessment
             <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-              {mode === "ai" ? "AI-assisted arm" : "Control arm"}
+              {isAi ? "AI-assisted arm" : "Control arm"}
             </span>
           </h2>
         </div>
@@ -318,104 +407,170 @@ export function StudyPanel({
         {disabled
           ? "Load a case to start timing and grading."
           : alreadySaved
-            ? "Saved. Load the next case to continue."
+            ? "Saved. Upload or select new X-rays to start the next case."
             : running
               ? "Stopwatch is running. Pause if you need to step away."
               : "Paused. Resume when you return to the case."}
       </p>
+      {caseId && (
+        <p className="mt-1 break-all text-xs text-slate-500">
+          Case: <code>{caseId}</code>
+        </p>
+      )}
 
       {!disabled && (
         <div className="mt-4 space-y-4">
-          {/* Pre-AI (or sole) reader answer */}
-          <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-sm font-semibold text-slate-800">
-                {mode === "ai" ? "Your read — before AI" : "Your read"}
-              </span>
-              {mode === "ai" && preLocked && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                  <Lock className="h-3 w-3" />
-                  Locked
+          {/* Pre-AI read (AI arm only) */}
+          {isAi && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-800">
+                  Your read — before AI
                 </span>
+                {preLocked && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                    <Lock className="h-3 w-3" />
+                    Locked
+                  </span>
+                )}
+              </div>
+              <GradeConfidenceForm
+                idPrefix="pre"
+                grade={preGrade}
+                confidence={preConf}
+                onGradeChange={setPreGrade}
+                onConfidenceChange={setPreConf}
+                disabled={preLocked}
+              />
+              {!preLocked && (
+                <div className="mt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!preComplete}
+                    onClick={() => setPreLocked(true)}
+                    className="gap-1.5"
+                  >
+                    <Lock className="h-4 w-4" />
+                    Lock pre-AI read
+                  </Button>
+                  <span className="ml-2 text-xs text-slate-500">
+                    Locking reveals the AI analysis; the pre-AI answer can’t be changed afterwards.
+                  </span>
+                </div>
               )}
             </div>
-            <GradeConfidenceForm
-              idPrefix="pre"
-              grade={preGrade}
-              confidence={preConf}
-              onGradeChange={setPreGrade}
-              onConfidenceChange={setPreConf}
-              disabled={mode === "ai" && preLocked}
-            />
-            {mode === "ai" && !preLocked && (
-              <div className="mt-3">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!preComplete}
-                  onClick={() => setPreLocked(true)}
-                  className="gap-1.5"
-                >
-                  <Lock className="h-4 w-4" />
-                  Lock pre-AI read
-                </Button>
-                <span className="ml-2 text-xs text-slate-500">
-                  Locking reveals the AI analysis; the pre-AI answer can’t be changed afterwards.
-                </span>
-              </div>
-            )}
-          </div>
+          )}
 
-          {/* Post-AI reader answer (AI arm only, after the result is shown) */}
-          {mode === "ai" && preLocked && (
+          {/* Step 1 — decision grade (control: straight away; AI: after results) */}
+          {(!isAi || preLocked) && (
             <div
               className={`rounded-lg border p-4 ${
-                aiRevealed
+                !isAi || aiRevealed || gradeSubmitted
                   ? "border-slate-200 bg-white"
                   : "border-dashed border-slate-200 bg-slate-50/40"
               }`}
             >
-              <div className="mb-3 text-sm font-semibold text-slate-800">
-                Your read — after AI
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-slate-800">
+                  {isAi ? "Step 1 — Your grade after AI" : "Step 1 — Your grade"}
+                </span>
+                {gradeSubmitted && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                    <Check className="h-3 w-3" />
+                    Submitted
+                    {decisionSeconds !== null &&
+                      ` · decision time ${formatSeconds(decisionSeconds)}`}
+                  </span>
+                )}
               </div>
-              {aiRevealed ? (
-                <GradeConfidenceForm
-                  idPrefix="post"
-                  grade={postGrade}
-                  confidence={postConf}
-                  onGradeChange={setPostGrade}
-                  onConfidenceChange={setPostConf}
-                />
-              ) : (
+              {isAi && !aiRevealed && !gradeSubmitted ? (
                 <p className="text-sm text-muted-foreground">
-                  Run the AI analysis below, review it, then record your final read here.
+                  Run the AI analysis below and review it, then choose your grade here.
                 </p>
+              ) : (
+                <>
+                  <GradePicker
+                    idPrefix="decision"
+                    grade={decisionGrade}
+                    onGradeChange={isAi ? setPostGrade : setPreGrade}
+                    disabled={gradeSubmitted}
+                  />
+                  {!gradeSubmitted && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={submitGrade}
+                        disabled={!canSubmitGrade}
+                        className="gap-1.5 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
+                      >
+                        <Send className="h-4 w-4" />
+                        Submit grade
+                      </Button>
+                      <span className="text-xs text-slate-500">
+                        {decisionTimeNote}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
+            </div>
+          )}
+
+          {/* Step 2 — confidence + follow-up questions, then save */}
+          {gradeSubmitted && (
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="mb-3 text-sm font-semibold text-slate-800">
+                Step 2 — Confidence and follow-up
+              </div>
+              <div className="space-y-4">
+                <ConfidencePicker
+                  idPrefix="decision"
+                  confidence={decisionConf}
+                  onConfidenceChange={setDecisionConf}
+                  disabled={alreadySaved}
+                />
+                <label className="block text-sm">
+                  <span className="mb-1.5 block font-medium text-slate-700">
+                    Comments (optional)
+                  </span>
+                  <textarea
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    disabled={alreadySaved}
+                    rows={2}
+                    placeholder="Anything notable about this case or the AI output"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+              </div>
+              <div className="mt-4">
+                <Button
+                  size="sm"
+                  onClick={saveCase}
+                  disabled={!canSave}
+                  className="gap-1.5 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
+                >
+                  <Send className="h-4 w-4" />
+                  {saving ? "Submitting…" : "Submit assessment"}
+                </Button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Button
-          size="sm"
-          onClick={saveCase}
-          disabled={!canSave}
-          className="gap-1.5 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? "Saving…" : "Save assessment"}
-        </Button>
-        {savedAt && !saveError && (
-          <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
-            <Check className="h-4 w-4" />
-            Saved at {savedAt}
-          </span>
-        )}
-        {saveHint && (
-          <span className="text-sm text-amber-700">{saveHint}</span>
-        )}
-      </div>
+      {(savedAt || hint) && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {savedAt && !saveError && (
+            <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
+              <Check className="h-4 w-4" />
+              Saved at {savedAt}
+            </span>
+          )}
+          {hint && <span className="text-sm text-amber-700">{hint}</span>}
+        </div>
+      )}
 
       {saveError && (
         <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -461,6 +616,8 @@ export function StudyPanel({
                     <th className="px-3 py-2 text-right font-semibold">Mean</th>
                     <th className="px-3 py-2 text-right font-semibold">Median</th>
                     <th className="px-3 py-2 text-right font-semibold">Total</th>
+                    <th className="px-3 py-2 text-right font-semibold">Mean decision</th>
+                    <th className="px-3 py-2 text-right font-semibold">Median decision</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -496,6 +653,16 @@ export function StudyPanel({
                         <td className="px-3 py-2 text-right tabular-nums">
                           {formatSeconds(row.total_seconds)}
                         </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {row.mean_decision_seconds !== null
+                            ? formatSeconds(row.mean_decision_seconds)
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {row.median_decision_seconds !== null
+                            ? formatSeconds(row.median_decision_seconds)
+                            : "—"}
+                        </td>
                       </tr>
                     );
                   })}
@@ -514,7 +681,7 @@ export function StudyPanel({
                 key={`${entry.logged_at}-${i}`}
                 className="flex flex-wrap items-center justify-between gap-2 text-sm"
               >
-                <span className="text-slate-700">
+                <span className="break-all text-slate-700">
                   <span className="font-mono font-semibold">
                     {entry.elapsed_hms}
                   </span>{" "}
@@ -522,6 +689,9 @@ export function StudyPanel({
                   {entry.mode === "ai" ? "AI" : "Control"}
                   {entry.pre_grade ? ` · pre ${entry.pre_grade}` : ""}
                   {entry.post_grade ? ` → post ${entry.post_grade}` : ""}
+                  {typeof entry.decision_time_seconds === "number"
+                    ? ` · decision ${formatSeconds(entry.decision_time_seconds)}`
+                    : ""}
                   {entry.reviewer ? ` · ${entry.reviewer}` : ""}
                 </span>
                 <span className="text-xs text-slate-400">

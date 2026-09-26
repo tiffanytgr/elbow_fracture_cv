@@ -24,14 +24,21 @@ interface StudyPayload {
   reviewer?: string | null;
   mode?: string | null; // "ai" | "control"
   case_id?: string | null;
+  ap_path?: string | null;
+  lat_path?: string | null;
   input_mode?: string | null;
   pre_grade?: string | null;
   pre_confidence?: number | null;
   post_grade?: string | null;
   post_confidence?: number | null;
-  ai_grade?: string | null;
+  ai_gartland_grade?: string | null;
+  ai_cnn_grade?: string | null;
+  ai_geometric_grade?: string | null;
   ai_confidence?: number | null;
   notes?: string | null;
+  decision_time_seconds?: number | null;
+  decision_started_at?: string | null;
+  grade_submitted_at?: string | null;
   started_at?: string | null;
   ended_at?: string | null;
   elapsed_seconds?: number | null;
@@ -86,13 +93,20 @@ const RAW_COLUMNS = [
   "reviewer",
   "mode",
   "case_id",
+  "ap_path",
+  "lat_path",
   "input_mode",
   "pre_grade",
   "pre_confidence",
   "post_grade",
   "post_confidence",
-  "ai_grade",
+  "ai_gartland_grade",
+  "ai_cnn_grade",
+  "ai_geometric_grade",
   "ai_confidence",
+  "decision_started_at",
+  "grade_submitted_at",
+  "decision_time_seconds",
   "elapsed_seconds",
   "elapsed_hms",
   "notes",
@@ -102,7 +116,12 @@ function rawCsv(entries: Entry[]): string {
   const rows: (string | number | null | undefined)[][] = [
     [...RAW_COLUMNS],
     ...entries.map((e) =>
-      RAW_COLUMNS.map((c) => e[c] as string | number | null),
+      RAW_COLUMNS.map((c) =>
+        // Records written before the rename stored the Gartland grade as ai_grade.
+        c === "ai_gartland_grade" && e[c] === undefined
+          ? (e.ai_grade as string | null)
+          : (e[c] as string | number | null),
+      ),
     ),
   ];
   return toCsv(rows);
@@ -116,27 +135,39 @@ interface GroupStats {
   min_seconds: number;
   max_seconds: number;
   total_seconds: number;
+  mean_decision_seconds: number | null;
+  median_decision_seconds: number | null;
 }
 
-function statsFor(group: string, seconds: number[]): GroupStats {
+function median(sorted: number[]): number {
+  const n = sorted.length;
+  if (n === 0) return 0;
+  return n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+}
+
+function statsFor(
+  group: string,
+  seconds: number[],
+  decisionSeconds: number[],
+): GroupStats {
   const sorted = [...seconds].sort((a, b) => a - b);
   const n = sorted.length;
   const total = sorted.reduce((a, b) => a + b, 0);
-  const median =
-    n === 0
-      ? 0
-      : n % 2
-        ? sorted[(n - 1) / 2]
-        : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  const decisions = [...decisionSeconds].sort((a, b) => a - b);
+  const nd = decisions.length;
   const round1 = (x: number) => Math.round(x * 10) / 10;
   return {
     group,
     count: n,
     mean_seconds: n ? round1(total / n) : 0,
-    median_seconds: round1(median),
+    median_seconds: round1(median(sorted)),
     min_seconds: n ? round1(sorted[0]) : 0,
     max_seconds: n ? round1(sorted[n - 1]) : 0,
     total_seconds: round1(total),
+    mean_decision_seconds: nd
+      ? round1(decisions.reduce((a, b) => a + b, 0) / nd)
+      : null,
+    median_decision_seconds: nd ? round1(median(decisions)) : null,
   };
 }
 
@@ -145,16 +176,21 @@ function summarize(entries: Entry[], groupBy: string): GroupStats[] {
     typeof e.elapsed_seconds === "number" ? e.elapsed_seconds : NaN;
   const timed = entries.filter((e) => isFinite(secondsOf(e)));
 
-  const overall = statsFor("ALL", timed.map(secondsOf));
+  const decisionsOf = (list: Entry[]) =>
+    list
+      .map((e) => e.decision_time_seconds)
+      .filter((v): v is number => typeof v === "number" && isFinite(v));
 
-  const buckets = new Map<string, number[]>();
+  const overall = statsFor("ALL", timed.map(secondsOf), decisionsOf(timed));
+
+  const buckets = new Map<string, Entry[]>();
   for (const e of timed) {
     const key = (e[groupBy] as string | null) ?? "(none)";
     if (!buckets.has(key)) buckets.set(key, []);
-    buckets.get(key)!.push(secondsOf(e));
+    buckets.get(key)!.push(e);
   }
   const groups = Array.from(buckets.entries())
-    .map(([key, secs]) => statsFor(key, secs))
+    .map(([key, list]) => statsFor(key, list.map(secondsOf), decisionsOf(list)))
     .sort((a, b) => a.group.localeCompare(b.group));
 
   return [overall, ...groups];
@@ -168,11 +204,13 @@ const SUMMARY_COLUMNS: (keyof GroupStats)[] = [
   "min_seconds",
   "max_seconds",
   "total_seconds",
+  "mean_decision_seconds",
+  "median_decision_seconds",
 ];
 
 function summaryCsv(stats: GroupStats[], groupLabel: string): string {
   const header = ["group_" + groupLabel, ...SUMMARY_COLUMNS.slice(1)];
-  const rows: (string | number)[][] = [
+  const rows: (string | number | null)[][] = [
     header,
     ...stats.map((s) => SUMMARY_COLUMNS.map((c) => s[c])),
   ];
@@ -223,21 +261,34 @@ export async function POST(req: NextRequest) {
     }
 
     const num = (v: number | null | undefined) =>
-      typeof v === "number" ? v : null;
+      typeof v === "number" && isFinite(v) ? v : null;
+    const decisionSeconds = num(body.decision_time_seconds);
 
     const entry = {
       reviewer: body.reviewer?.trim() || null,
       mode: body.mode,
       case_id: body.case_id ?? null,
+      ap_path: body.ap_path ?? null,
+      lat_path: body.lat_path ?? null,
       input_mode: body.input_mode ?? null,
       pre_grade: body.pre_grade,
       pre_confidence: num(body.pre_confidence),
       // Post-AI answer only applies to the AI arm.
       post_grade: body.mode === "ai" ? body.post_grade ?? null : null,
       post_confidence: body.mode === "ai" ? num(body.post_confidence) : null,
-      ai_grade: body.mode === "ai" ? body.ai_grade ?? null : null,
+      ai_gartland_grade:
+        body.mode === "ai" ? body.ai_gartland_grade ?? null : null,
+      ai_cnn_grade: body.mode === "ai" ? body.ai_cnn_grade ?? null : null,
+      ai_geometric_grade:
+        body.mode === "ai" ? body.ai_geometric_grade ?? null : null,
       ai_confidence: body.mode === "ai" ? num(body.ai_confidence) : null,
       notes: body.notes?.trim() || null,
+      decision_started_at: body.decision_started_at ?? null,
+      grade_submitted_at: body.grade_submitted_at ?? null,
+      decision_time_seconds:
+        decisionSeconds === null
+          ? null
+          : Math.round(Math.max(0, decisionSeconds) * 1000) / 1000,
       elapsed_seconds: Math.round(elapsedSeconds * 1000) / 1000,
       elapsed_hms: secondsToHms(elapsedSeconds),
       started_at: body.started_at ?? null,

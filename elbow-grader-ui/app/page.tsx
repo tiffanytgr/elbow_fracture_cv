@@ -17,7 +17,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sidebar } from "@/components/Sidebar";
 import { StudyPanel } from "@/components/StudyPanel";
 import { CaseImageBoard } from "@/components/CaseImageBoard";
-import { FileUploader } from "@/components/FileUploader";
+import {
+  FileUploader,
+  filePathOf,
+  type FileChangeKind,
+} from "@/components/FileUploader";
 import {
   DEMO_CASES,
   DemoCaseSelector,
@@ -59,6 +63,10 @@ export default function HomePage() {
   const [uploadedLatFile, setUploadedLatFile] = useState<File | null>(null);
   const [demoApFile, setDemoApFile] = useState<File | null>(null);
   const [demoLatFile, setDemoLatFile] = useState<File | null>(null);
+  const [uploadedApPath, setUploadedApPath] = useState<string | null>(null);
+  const [uploadedLatPath, setUploadedLatPath] = useState<string | null>(null);
+  // Bumped whenever uploaded images start a new case (see handleUpload).
+  const [uploadCaseSeq, setUploadCaseSeq] = useState(0);
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [loadingDemoId, setLoadingDemoId] = useState<string | null>(null);
   const [config, setConfig] = useState<GraderConfig>(DEFAULT_CONFIG);
@@ -88,18 +96,27 @@ export default function HomePage() {
   }:${configVersion}`;
   const resultIsStale = result !== null && currentInputKey !== resultInputKey;
 
+  // Source path of each loaded X-ray; the case identifier is built from these.
+  const selectedDemo = DEMO_CASES.find((d) => d.id === selectedDemoId) ?? null;
+  const apPath =
+    inputMode === "upload"
+      ? uploadedApPath
+      : demoApFile
+        ? selectedDemo?.apUrl ?? null
+        : null;
+  const latPath =
+    inputMode === "upload"
+      ? uploadedLatPath
+      : demoLatFile
+        ? selectedDemo?.latUrl ?? null
+        : null;
+  const caseId = [apPath, latPath].filter(Boolean).join(" + ") || null;
   // Identity of the loaded case, used to drive the timer and per-case reset.
-  const caseId =
-    inputMode === "demo"
-      ? selectedDemoId
-      : [uploadedApFile?.name, uploadedLatFile?.name]
-          .filter(Boolean)
-          .join(" + ") || null;
   const caseKey = !canRun
     ? null
     : inputMode === "demo"
       ? `demo:${selectedDemoId}:${demoVersion}`
-      : `upload:${uploadVersion}`;
+      : `upload:${uploadCaseSeq}`;
 
   const isControl = mode === "control";
   // A case is "in progress" once loaded and until it has been saved; the study
@@ -142,6 +159,29 @@ export default function HomePage() {
       window.localStorage.setItem(MODE_STORAGE_KEY, next);
     } catch {
       /* ignore */
+    }
+  }
+
+  /**
+   * Uploading new X-ray images starts a new case. The one exception is adding
+   * the missing second view to an unsaved case (e.g. LAT after AP), which
+   * completes the current case. Rotating or removing an image never does.
+   */
+  function handleUpload(view: "ap" | "lat", file: File | null, kind: FileChangeKind) {
+    const slotFile = view === "ap" ? uploadedApFile : uploadedLatFile;
+    const otherFile = view === "ap" ? uploadedLatFile : uploadedApFile;
+    const setFile = view === "ap" ? setUploadedApFile : setUploadedLatFile;
+    const setPath = view === "ap" ? setUploadedApPath : setUploadedLatPath;
+
+    setFile(file);
+    if (kind !== "rotate") setPath(file ? filePathOf(file) : null);
+    setUploadVersion((version) => version + 1);
+
+    if (kind === "new") {
+      const currentKey = `upload:${uploadCaseSeq}`;
+      const completesOpenCase =
+        slotFile === null && otherFile !== null && savedCaseKey !== currentKey;
+      if (!completesOpenCase) setUploadCaseSeq((seq) => seq + 1);
     }
   }
 
@@ -215,6 +255,8 @@ export default function HomePage() {
       form.append("confidence_threshold", String(config.confidenceThreshold));
       form.append("run_full_lat_alignment", String(config.runFullLatAlignment));
       form.append("run_sam2", String(config.runSam2));
+      if (apFile && apPath) form.append("ap_source_path", apPath);
+      if (latFile && latPath) form.append("lat_source_path", latPath);
 
       const res = await fetch("/api/predict", { method: "POST", body: form });
       const data = await res.json();
@@ -342,7 +384,7 @@ export default function HomePage() {
               </div>
               <p className="mt-1 text-xs text-slate-500">
                 {caseInProgress
-                  ? "Arm is locked while a case is in progress. Save the case to change it."
+                  ? "Arm is locked while a case is in progress. Submit the assessment to change it."
                   : isControl
                     ? "Control arm: images only, no AI output. One read per case."
                     : "AI-assisted arm: record your read before and after seeing the AI."}
@@ -405,20 +447,14 @@ export default function HomePage() {
                   hint="Required for fracture screening"
                   file={uploadedApFile}
                   disabled={loading}
-                  onFileChange={(file) => {
-                    setUploadedApFile(file);
-                    setUploadVersion((version) => version + 1);
-                  }}
+                  onFileChange={(file, kind) => handleUpload("ap", file, kind)}
                 />
                 <FileUploader
                   label="LAT View — Lateral (optional)"
                   hint="Required for Grade 1 vs 2 sub-grading"
                   file={uploadedLatFile}
                   disabled={loading}
-                  onFileChange={(file) => {
-                    setUploadedLatFile(file);
-                    setUploadVersion((version) => version + 1);
-                  }}
+                  onFileChange={(file, kind) => handleUpload("lat", file, kind)}
                 />
               </div>
             ) : (
@@ -471,11 +507,15 @@ export default function HomePage() {
         <StudyPanel
           caseKey={caseKey}
           caseId={caseId}
+          apPath={apPath}
+          latPath={latPath}
           inputMode={inputMode}
           reviewer={reviewer}
           mode={mode}
           aiRevealed={aiRevealed}
-          aiGrade={aiRevealed ? result?.final_grade ?? null : null}
+          aiGartlandGrade={aiRevealed ? result?.final_grade ?? null : null}
+          aiCnnGrade={aiRevealed ? result?.cnn_grade ?? null : null}
+          aiGeometricGrade={aiRevealed ? result?.geometric_grade ?? null : null}
           aiConfidence={aiRevealed ? result?.confidence ?? null : null}
           onPreLockedChange={setPreLocked}
           onSaved={handleSaved}
@@ -547,7 +587,7 @@ export default function HomePage() {
               />
             </div>
             <p className="pl-8 text-sm text-muted-foreground">
-              AI analysis complete. Review it, then record your post-AI read in the
+              AI analysis complete. Review it, then choose and submit your grade in the
               assessment panel above.
             </p>
 

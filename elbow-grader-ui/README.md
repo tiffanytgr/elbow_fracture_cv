@@ -45,34 +45,63 @@ Set `BACKEND_URL` in `.env.local` to point at a remote backend.
 
 The page runs as a reader-study tool with two arms, chosen per case in the
 **Study Session** bar (reviewer name + arm). The arm is **locked once a case is
-loaded** and unlocks after the case is saved, so it can't be flipped mid-case.
+loaded** and unlocks after the case is submitted, so it can't be flipped mid-case.
 
 - **AI-assisted arm** — the reader records a grade + confidence **before** the AI
   is shown, locks it, runs the AI analysis, reviews it (Grad-CAM, Baumann, AHL,
-  bone profile), then records a **post-AI** grade + confidence. The Analyse
-  button stays disabled until the pre-AI read is locked, and the AI result is
-  only revealed afterwards.
+  bone profile), then records a **post-AI** read in two steps (below). The
+  Analyse button stays disabled until the pre-AI read is locked, and the AI
+  result is only revealed afterwards.
 - **Control arm** — no AI at all: the Sidebar, Analyse step, and results are
-  hidden, so the reader sees only the AP/LAT images and records **one** grade +
-  confidence per case.
+  hidden, so the reader sees only the AP/LAT images and records **one** read
+  per case in the same two steps.
+
+The decision read is submitted in two steps:
+
+1. **Submit grade** — the reader picks a Gartland grade and submits it. This
+   stops the **decision time** clock, which measures how long the clinician
+   took to decide on a grade **after the AI results appeared** (AI arm) or
+   after the case loaded (control arm). It uses the stopwatch, so paused time
+   is excluded; re-running the AI before submitting restarts the clock.
+2. **Submit assessment** — the reader then rates confidence (1–5) and answers
+   the follow-up questions (currently an optional comments box), and submits.
+   This saves the case.
+
+**Cases.** Uploading new X-ray images (or selecting another example case)
+starts a new case: the stopwatch, answers, and AI result reset. Adding the
+missing second view to an unsaved case (e.g. the LAT after the AP) completes
+the current case instead; rotating or removing an image never starts a new one.
+
+**Case identifier.** `case_id` is built from the file path of each X-ray
+(`<ap path> + <lat path>`), and `ap_path` / `lat_path` are logged separately.
+Example cases use their bundled path (e.g. `/demo/grade-2a/a145-ap.png`). For
+uploads, browsers do not expose a file's absolute path, so the path is the
+folder-relative path when available and otherwise the file name — keep file
+names unique per case.
 
 Both arms share a per-case **stopwatch** that auto-starts when a case loads and
-has a **Pause** button for stepping away. **Save assessment** appends one record
-to a JSON Lines file **on the machine running the app** (written server side via
-`POST /api/study-log`), so it works for a locally-hosted deployment on a remote
-laptop. Grades use the AI label space (`Normal`, `Grade 1`, `Grade 2a`,
-`Grade 2b`, `Grade 3`) with a 1–5 confidence scale.
+has a **Pause** button for stepping away. **Submit assessment** appends one
+record to a JSON Lines file **on the machine running the app** (written server
+side via `POST /api/study-log`), so it works for a locally-hosted deployment on
+a remote laptop. Grades use the AI label space (`Normal`, `Grade 1`,
+`Grade 2a`, `Grade 2b`, `Grade 3`) with a 1–5 confidence scale.
 
 Each line is a JSON object, e.g.:
 
 ```json
-{"reviewer":"TT","mode":"ai","case_id":"a145","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_grade":"Grade 2b","ai_confidence":0.81,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
+{"reviewer":"TT","mode":"ai","case_id":"/demo/grade-2a/a145-ap.png + /demo/grade-2a/a145-lat.png","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
 ```
 
-In control records `post_grade`, `post_confidence`, `ai_grade` and
-`ai_confidence` are `null`. The default location is
+`ai_gartland_grade` is the pipeline's final Gartland grade; `ai_cnn_grade` and
+`ai_geometric_grade` are the CNN and geometric (AHL) grades it was derived
+from. In control records `post_grade`, `post_confidence` and the `ai_*` fields
+are `null`. The default location is
 `elbow-grader-ui/logs/study-records.jsonl` (git-ignored); override with
 `STUDY_LOG_PATH`.
+
+The backend's `logs/predictions.log` (one line per AI run) uses the same
+path-based `case_id` and also records `gartland_grade`, `cnn_grade` and
+`geometric_grade`.
 
 `GET /api/study-log` reads the log back:
 
@@ -80,7 +109,7 @@ In control records `post_grade`, `post_confidence`, `ai_grade` and
 |---|---|
 | `?limit=N` | N most recent records as JSON (shown under "Recently logged") |
 | `?format=csv` | Every record as a CSV download |
-| `?summary=1` | Grouped timing stats (count, mean/median/min/max/total seconds) as JSON |
+| `?summary=1` | Grouped timing stats (count, mean/median/min/max/total seconds, mean/median decision time) as JSON |
 | `?summary=1&format=csv` | The same grouped stats as a CSV download |
 | `&group_by=…` | Grouping field for the summary — `mode` (default), `reviewer`, `pre_grade`, or `input_mode` |
 
