@@ -277,6 +277,7 @@ async def predict(
 
     return {
         "processing_time_seconds": processing_time_seconds,
+        "prediction_log_path": str(_LOG_FILE),
         "final_grade": result.final_grade,
         "cnn_grade": result.cnn_grade,
         "geometric_grade": result.geometric_grade,

@@ -35,6 +35,7 @@ interface StudyPayload {
   ai_cnn_grade?: string | null;
   ai_geometric_grade?: string | null;
   ai_confidence?: number | null;
+  ai_processing_time_seconds?: number | null;
   notes?: string | null;
   decision_time_seconds?: number | null;
   decision_started_at?: string | null;
@@ -104,6 +105,7 @@ const RAW_COLUMNS = [
   "ai_cnn_grade",
   "ai_geometric_grade",
   "ai_confidence",
+  "ai_processing_time_seconds",
   "decision_started_at",
   "grade_submitted_at",
   "decision_time_seconds",
@@ -282,6 +284,8 @@ export async function POST(req: NextRequest) {
       ai_geometric_grade:
         body.mode === "ai" ? body.ai_geometric_grade ?? null : null,
       ai_confidence: body.mode === "ai" ? num(body.ai_confidence) : null,
+      ai_processing_time_seconds:
+        body.mode === "ai" ? num(body.ai_processing_time_seconds) : null,
       notes: body.notes?.trim() || null,
       decision_started_at: body.decision_started_at ?? null,
       grade_submitted_at: body.grade_submitted_at ?? null,

@@ -91,12 +91,15 @@ a remote laptop. Grades use the AI label space (`Normal`, `Grade 1`,
 Each line is a JSON object, e.g.:
 
 ```json
-{"reviewer":"TT","mode":"ai","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
+{"reviewer":"TT","mode":"ai","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"ai_processing_time_seconds":7.3,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
 ```
 
 `ai_gartland_grade` is the pipeline's final Gartland grade; `ai_cnn_grade` and
 `ai_geometric_grade` are the CNN and geometric (AHL) grades it was derived
-from. In control records `post_grade`, `post_confidence` and the `ai_*` fields
+from. `ai_processing_time_seconds` is the backend model run time for the AI
+result the reader saw. After **Submit assessment**, the panel shows the full
+path of the study log and (AI arm) of the backend's `predictions.log`. In
+control records `post_grade`, `post_confidence` and the `ai_*` fields
 are `null`. The default location is
 `elbow-grader-ui/logs/study-records.jsonl` (git-ignored); override with
 `STUDY_LOG_PATH`.

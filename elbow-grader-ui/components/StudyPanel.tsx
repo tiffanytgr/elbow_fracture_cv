@@ -58,6 +58,10 @@ interface StudyPanelProps {
   aiCnnGrade?: string | null;
   aiGeometricGrade?: string | null;
   aiConfidence?: number | null;
+  /** Backend model run time for the AI result shown, in seconds. */
+  aiProcessingSeconds?: number | null;
+  /** Where the backend writes predictions.log (AI arm only). */
+  predictionLogPath?: string | null;
   /** Fires whenever the pre-AI answer lock state changes (gates Analyse + reveal). */
   onPreLockedChange: (locked: boolean) => void;
   /** Fires after a case is saved, with the caseKey that was saved. */
@@ -93,6 +97,8 @@ export function StudyPanel({
   aiCnnGrade = null,
   aiGeometricGrade = null,
   aiConfidence = null,
+  aiProcessingSeconds = null,
+  predictionLogPath = null,
   onPreLockedChange,
   onSaved,
 }: StudyPanelProps) {
@@ -297,6 +303,7 @@ export function StudyPanel({
           ai_cnn_grade: isAi ? aiCnnGrade : null,
           ai_geometric_grade: isAi ? aiGeometricGrade : null,
           ai_confidence: isAi ? aiConfidence : null,
+          ai_processing_time_seconds: isAi ? aiProcessingSeconds : null,
           notes: comments,
           decision_time_seconds: decisionSeconds,
           decision_started_at: decisionStartedAtRef.current,
@@ -575,6 +582,19 @@ export function StudyPanel({
             </span>
           )}
           {hint && <span className="text-sm text-amber-700">{hint}</span>}
+        </div>
+      )}
+
+      {savedAt && !saveError && logPath && (
+        <div className="mt-2 rounded-md bg-green-50 px-3 py-2 text-xs text-green-900">
+          <p className="break-all">
+            Assessment log: <code>{logPath}</code>
+          </p>
+          {isAi && predictionLogPath && (
+            <p className="mt-1 break-all">
+              AI prediction log (backend machine): <code>{predictionLogPath}</code>
+            </p>
+          )}
         </div>
       )}
 

@@ -539,6 +539,10 @@ export default function HomePage() {
           aiCnnGrade={aiRevealed ? result?.cnn_grade ?? null : null}
           aiGeometricGrade={aiRevealed ? result?.geometric_grade ?? null : null}
           aiConfidence={aiRevealed ? result?.confidence ?? null : null}
+          aiProcessingSeconds={
+            aiRevealed ? result?.processing_time_seconds ?? null : null
+          }
+          predictionLogPath={result?.prediction_log_path ?? null}
           onPreLockedChange={setPreLocked}
           onSaved={handleSaved}
         />
