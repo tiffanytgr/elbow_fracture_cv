@@ -52,6 +52,8 @@ export interface RegressorBaumannData {
 
 export interface PredictResponse {
   processing_time_seconds: number | null;
+  /** Absolute path of the backend's predictions.log on the backend machine. */
+  prediction_log_path?: string | null;
   final_grade: string | null;
   cnn_grade: string | null;
   geometric_grade: string | null;

@@ -11,7 +11,21 @@ interface FileUploaderProps {
   accept?: string;
   file: File | null;
   disabled?: boolean;
-  onFileChange: (file: File | null) => void;
+  /**
+   * `kind` says why the file changed: a newly chosen image ("new"), a rotated
+   * copy of the current image ("rotate"), or removal ("clear").
+   */
+  onFileChange: (file: File | null, kind: FileChangeKind) => void;
+}
+
+export type FileChangeKind = "new" | "rotate" | "clear";
+
+/**
+ * Best available client-side path for a chosen file. Browsers never expose the
+ * absolute path; `webkitRelativePath` is set for folder picks, else the name.
+ */
+export function filePathOf(file: File): string {
+  return file.webkitRelativePath || file.name;
 }
 
 export function FileUploader({
@@ -59,7 +73,7 @@ export function FileUploader({
 
   function handleFile(f: File | null) {
     if (disabled) return;
-    onFileChange(f);
+    onFileChange(f, f ? "new" : "clear");
   }
 
   function onInputChange(e: ChangeEvent<HTMLInputElement>) {
@@ -99,7 +113,7 @@ export function FileUploader({
         if (!blob) { setRotating(false); return; }
         const mimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
         const rotated = new File([blob], file.name, { type: mimeType });
-        onFileChange(rotated);
+        onFileChange(rotated, "rotate");
         setRotating(false);
       }, file.type);
     } catch {

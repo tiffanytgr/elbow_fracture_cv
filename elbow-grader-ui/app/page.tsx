@@ -1,12 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { Grid2X2, Images, Loader2, Play, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  FlaskConical,
+  Grid2X2,
+  Images,
+  Loader2,
+  Play,
+  ShieldCheck,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sidebar } from "@/components/Sidebar";
-import { FileUploader } from "@/components/FileUploader";
+import { StudyPanel } from "@/components/StudyPanel";
+import { CaseImageBoard } from "@/components/CaseImageBoard";
+import {
+  FileUploader,
+  filePathOf,
+  type FileChangeKind,
+} from "@/components/FileUploader";
 import {
   DEMO_CASES,
   DemoCaseSelector,
@@ -27,6 +42,8 @@ const DEFAULT_CONFIG: GraderConfig = {
   runSam2: true,
 };
 
+const REVIEWER_STORAGE_KEY = "elbow-grader-reviewer";
+
 function StepBadge({ n, done }: { n: number; done: boolean }) {
   return (
     <span
@@ -44,6 +61,11 @@ export default function HomePage() {
   const [uploadedLatFile, setUploadedLatFile] = useState<File | null>(null);
   const [demoApFile, setDemoApFile] = useState<File | null>(null);
   const [demoLatFile, setDemoLatFile] = useState<File | null>(null);
+  const [uploadedApPath, setUploadedApPath] = useState<string | null>(null);
+  const [uploadedLatPath, setUploadedLatPath] = useState<string | null>(null);
+  // Bumped whenever uploaded images start a new case (see handleUpload).
+  const [uploadCaseSeq, setUploadCaseSeq] = useState(0);
+  const [caseIdInput, setCaseIdInput] = useState("");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [loadingDemoId, setLoadingDemoId] = useState<string | null>(null);
   const [config, setConfig] = useState<GraderConfig>(DEFAULT_CONFIG);
@@ -59,6 +81,11 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Study-session state.
+  const [reviewer, setReviewer] = useState("");
+  const [preLocked, setPreLocked] = useState(false);
+  const [savedCaseKey, setSavedCaseKey] = useState<string | null>(null);
+
   const apFile = inputMode === "upload" ? uploadedApFile : demoApFile;
   const latFile = inputMode === "upload" ? uploadedLatFile : demoLatFile;
   const canRun = apFile !== null || latFile !== null;
@@ -66,6 +93,86 @@ export default function HomePage() {
     inputMode === "upload" ? uploadVersion : demoVersion
   }:${configVersion}`;
   const resultIsStale = result !== null && currentInputKey !== resultInputKey;
+
+  // Source path of each loaded X-ray; the case identifier is built from these.
+  const selectedDemo = DEMO_CASES.find((d) => d.id === selectedDemoId) ?? null;
+  const apPath =
+    inputMode === "upload"
+      ? uploadedApPath
+      : demoApFile
+        ? selectedDemo?.apUrl ?? null
+        : null;
+  const latPath =
+    inputMode === "upload"
+      ? uploadedLatPath
+      : demoLatFile
+        ? selectedDemo?.latUrl ?? null
+        : null;
+  // Case identifier entered by the reader; it is what the logs are keyed on.
+  const caseId = caseIdInput.trim() || null;
+  // Identity of the loaded case, used to drive the timer and per-case reset.
+  const caseKey = !canRun
+    ? null
+    : inputMode === "demo"
+      ? `demo:${selectedDemoId}:${demoVersion}`
+      : `upload:${uploadCaseSeq}`;
+
+  const aiRevealed = result !== null && !resultIsStale;
+
+  // Restore the reviewer from a previous session.
+  useEffect(() => {
+    try {
+      const storedReviewer = window.localStorage.getItem(REVIEWER_STORAGE_KEY);
+      if (storedReviewer) setReviewer(storedReviewer);
+    } catch {
+      /* localStorage may be unavailable */
+    }
+  }, []);
+
+  // Clear any AI result whenever a new case loads, so the
+  // post-AI read always waits for a fresh analysis of the current case.
+  useEffect(() => {
+    setResult(null);
+    setError(null);
+  }, [caseKey]);
+
+  function persistReviewer(next: string) {
+    setReviewer(next);
+    try {
+      window.localStorage.setItem(REVIEWER_STORAGE_KEY, next.trim());
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Uploading new X-ray images starts a new case. The one exception is adding
+   * the missing second view to an unsaved case (e.g. LAT after AP), which
+   * completes the current case. Rotating or removing an image never does.
+   */
+  function handleUpload(view: "ap" | "lat", file: File | null, kind: FileChangeKind) {
+    const slotFile = view === "ap" ? uploadedApFile : uploadedLatFile;
+    const otherFile = view === "ap" ? uploadedLatFile : uploadedApFile;
+    const setFile = view === "ap" ? setUploadedApFile : setUploadedLatFile;
+    const setPath = view === "ap" ? setUploadedApPath : setUploadedLatPath;
+
+    setFile(file);
+    if (kind !== "rotate") setPath(file ? filePathOf(file) : null);
+    setUploadVersion((version) => version + 1);
+
+    if (kind === "new") {
+      const currentKey = `upload:${uploadCaseSeq}`;
+      const completesOpenCase =
+        slotFile === null && otherFile !== null && savedCaseKey !== currentKey;
+      if (!completesOpenCase) setUploadCaseSeq((seq) => seq + 1);
+    }
+  }
+
+  const handleSaved = useCallback((key: string) => {
+    setSavedCaseKey(key);
+    // Clear the ID so the next case can't be logged under this one by mistake.
+    setCaseIdInput("");
+  }, []);
 
   function changeInputMode(mode: "upload" | "demo") {
     if (loading || loadingDemoId !== null || mode === inputMode) return;
@@ -106,6 +213,7 @@ export default function HomePage() {
         }),
       );
       setSelectedDemoId(demo.id);
+      setCaseIdInput(demo.id);
       setDemoVersion((version) => version + 1);
     } catch (e) {
       setDemoApFile(null);
@@ -119,7 +227,7 @@ export default function HomePage() {
   }
 
   async function handleRun() {
-    if (!canRun || loadingDemoId !== null) return;
+    if (!canRun || loadingDemoId !== null || !preLocked) return;
     const submittedInputKey = currentInputKey;
     const submittedHasLat = latFile !== null;
     setLoading(true);
@@ -133,6 +241,9 @@ export default function HomePage() {
       form.append("confidence_threshold", String(config.confidenceThreshold));
       form.append("run_full_lat_alignment", String(config.runFullLatAlignment));
       form.append("run_sam2", String(config.runSam2));
+      if (apFile && apPath) form.append("ap_source_path", apPath);
+      if (latFile && latPath) form.append("lat_source_path", latPath);
+      if (caseId) form.append("case_id", caseId);
 
       const res = await fetch("/api/predict", { method: "POST", body: form });
       const data = await res.json();
@@ -190,7 +301,7 @@ export default function HomePage() {
               Paediatric Elbow Fracture Grader
             </h1>
             <p className="mt-2 text-sm font-medium text-white/90 sm:text-base">
-              Automated Gartland classification for supracondylar humerus fractures
+              Gartland classification reader study — AI-assisted grading
             </p>
             <div className="mt-4">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/20 bg-blue-500/60 px-3 py-1.5 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
@@ -201,18 +312,54 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Study session — reviewer */}
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 text-blue-600" />
+            <h2 className="text-base font-semibold">Study Session</h2>
+          </div>
+          <label className="mt-4 block w-full max-w-xl text-sm">
+            <span className="mb-1 block font-medium text-slate-700">
+              Reviewer
+            </span>
+            <input
+              type="text"
+              value={reviewer}
+              onChange={(e) => persistReviewer(e.target.value)}
+              placeholder="Your name or initials"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </label>
+        </section>
+
         {/* Step 1 — Choose images */}
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <StepBadge n={1} done={canRun} />
-            <h2 className="text-base font-semibold">Choose X-ray Images</h2>
+            <StepBadge n={1} done={canRun && caseId !== null} />
+            <h2 className="text-base font-semibold">Enter Case ID and Choose X-ray Images</h2>
           </div>
           <p className="mt-1 pl-8 text-sm text-muted-foreground">
-            Upload your own AP/LAT images, or select a Grade 2a or Grade 2b
-            example to explore the analysis workflow.
+            Enter the case ID, then upload your own AP/LAT images or select a
+            Grade 2a or Grade 2b example case.
           </p>
 
           <div className="pl-8">
+            <label className="mt-4 block w-full max-w-xl text-sm">
+              <span className="mb-1 block font-medium text-slate-700">
+                Case ID <span className="text-red-600">*</span>
+              </span>
+              <input
+                type="text"
+                value={caseIdInput}
+                onChange={(e) => setCaseIdInput(e.target.value)}
+                placeholder="e.g. KKH-0123"
+                aria-required="true"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                Used as the case identifier in the logs. Required before grading.
+              </span>
+            </label>
             <div
               className="mt-4 grid w-full max-w-xl grid-cols-2 gap-3"
               role="group"
@@ -230,7 +377,7 @@ export default function HomePage() {
                 }`}
               >
                 <Images className="h-4 w-4" />
-                Try a demo case
+                Example case
               </button>
               <button
                 type="button"
@@ -255,20 +402,14 @@ export default function HomePage() {
                   hint="Required for fracture screening"
                   file={uploadedApFile}
                   disabled={loading}
-                  onFileChange={(file) => {
-                    setUploadedApFile(file);
-                    setUploadVersion((version) => version + 1);
-                  }}
+                  onFileChange={(file, kind) => handleUpload("ap", file, kind)}
                 />
                 <FileUploader
                   label="LAT View — Lateral (optional)"
                   hint="Required for Grade 1 vs 2 sub-grading"
                   file={uploadedLatFile}
                   disabled={loading}
-                  onFileChange={(file) => {
-                    setUploadedLatFile(file);
-                    setUploadVersion((version) => version + 1);
-                  }}
+                  onFileChange={(file, kind) => handleUpload("lat", file, kind)}
                 />
               </div>
             ) : (
@@ -278,16 +419,16 @@ export default function HomePage() {
                     <Sparkles className="mt-0.5 h-5 w-5 text-blue-600" />
                     <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Select a demo example
+                      Select an example case
                     </p>
                     <p className="text-xs text-slate-500">
-                      Explore curated cases to see how the model performs.
+                      Curated Grade 2a / 2b studies.
                     </p>
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">
                     <Grid2X2 className="h-3.5 w-3.5" />
-                    {DEMO_CASES.length} demo cases
+                    {DEMO_CASES.length} cases
                   </span>
                 </div>
                 <DemoCaseSelector
@@ -301,18 +442,57 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Review images — shown for the loaded case (both arms) */}
+        {canRun && (
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Images className="h-5 w-5 text-blue-600" />
+              <h2 className="text-base font-semibold">Review Images</h2>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Click either view to enlarge.
+            </p>
+            <div className="mt-4">
+              <CaseImageBoard apFile={apFile} latFile={latFile} />
+            </div>
+          </section>
+        )}
+
+        {/* Reader assessment — timer + pre/post reads + save */}
+        <StudyPanel
+          caseKey={caseKey}
+          caseId={caseId}
+          apPath={apPath}
+          latPath={latPath}
+          inputMode={inputMode}
+          reviewer={reviewer}
+          aiRevealed={aiRevealed}
+          aiGartlandGrade={aiRevealed ? result?.final_grade ?? null : null}
+          aiCnnGrade={aiRevealed ? result?.cnn_grade ?? null : null}
+          aiGeometricGrade={aiRevealed ? result?.geometric_grade ?? null : null}
+          aiConfidence={aiRevealed ? result?.confidence ?? null : null}
+          aiProcessingSeconds={
+            aiRevealed ? result?.processing_time_seconds ?? null : null
+          }
+          predictionLogPath={result?.prediction_log_path ?? null}
+          onPreLockedChange={setPreLocked}
+          onSaved={handleSaved}
+        />
+
         {/* Step 2 — Analyse */}
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <StepBadge n={2} done={result !== null} />
-            <h2 className="text-base font-semibold">Run Analysis</h2>
+            <h2 className="text-base font-semibold">Run AI Analysis</h2>
           </div>
 
-          <div className="flex items-center gap-4 pl-8">
+          <div className="flex flex-wrap items-center gap-4 pl-8">
             <Button
               size="lg"
               onClick={handleRun}
-              disabled={!canRun || loading || loadingDemoId !== null}
+              disabled={
+                !canRun || !caseId || loading || loadingDemoId !== null || !preLocked
+              }
               className="gap-2 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
             >
               {loading ? (
@@ -322,20 +502,16 @@ export default function HomePage() {
               )}
               {loading ? "Analysing…" : "Analyse X-rays"}
             </Button>
-            {resultIsStale && !loading && (
-              <p
-                className="text-sm font-medium text-amber-700"
-                role="status"
-                aria-live="polite"
-              >
-                New images or settings selected. Results below are from the previous analysis.
-              </p>
-            )}
             {!canRun && (
               <p className="text-sm text-muted-foreground">
                 {inputMode === "demo"
-                  ? "Select a demo case to enable analysis."
+                  ? "Select a case to enable analysis."
                   : "Upload at least one X-ray to enable analysis."}
+              </p>
+            )}
+            {canRun && !preLocked && (
+              <p className="text-sm text-amber-700">
+                Lock your pre-AI read above before running the analysis.
               </p>
             )}
             {loading && (
@@ -359,7 +535,7 @@ export default function HomePage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <StepBadge n={3} done={true} />
-                <h2 className="text-base font-semibold">Review Results</h2>
+                <h2 className="text-base font-semibold">Review AI Results</h2>
               </div>
               <ReportGenerator
                 result={result}
@@ -369,7 +545,8 @@ export default function HomePage() {
               />
             </div>
             <p className="pl-8 text-sm text-muted-foreground">
-              AI analysis complete. Please review the classification and supporting assessments.
+              AI analysis complete. Review it, then choose and submit your grade in the
+              assessment panel above.
             </p>
 
             <div className="pl-8 space-y-4">
