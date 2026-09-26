@@ -67,6 +67,7 @@ export default function HomePage() {
   const [uploadedLatPath, setUploadedLatPath] = useState<string | null>(null);
   // Bumped whenever uploaded images start a new case (see handleUpload).
   const [uploadCaseSeq, setUploadCaseSeq] = useState(0);
+  const [caseIdInput, setCaseIdInput] = useState("");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [loadingDemoId, setLoadingDemoId] = useState<string | null>(null);
   const [config, setConfig] = useState<GraderConfig>(DEFAULT_CONFIG);
@@ -110,7 +111,8 @@ export default function HomePage() {
       : demoLatFile
         ? selectedDemo?.latUrl ?? null
         : null;
-  const caseId = [apPath, latPath].filter(Boolean).join(" + ") || null;
+  // Case identifier entered by the reader; it is what the logs are keyed on.
+  const caseId = caseIdInput.trim() || null;
   // Identity of the loaded case, used to drive the timer and per-case reset.
   const caseKey = !canRun
     ? null
@@ -187,6 +189,8 @@ export default function HomePage() {
 
   const handleSaved = useCallback((key: string) => {
     setSavedCaseKey(key);
+    // Clear the ID so the next case can't be logged under this one by mistake.
+    setCaseIdInput("");
   }, []);
 
   function changeInputMode(mode: "upload" | "demo") {
@@ -228,6 +232,7 @@ export default function HomePage() {
         }),
       );
       setSelectedDemoId(demo.id);
+      setCaseIdInput(demo.id);
       setDemoVersion((version) => version + 1);
     } catch (e) {
       setDemoApFile(null);
@@ -257,6 +262,7 @@ export default function HomePage() {
       form.append("run_sam2", String(config.runSam2));
       if (apFile && apPath) form.append("ap_source_path", apPath);
       if (latFile && latPath) form.append("lat_source_path", latPath);
+      if (caseId) form.append("case_id", caseId);
 
       const res = await fetch("/api/predict", { method: "POST", body: form });
       const data = await res.json();
@@ -396,15 +402,31 @@ export default function HomePage() {
         {/* Step 1 — Choose images */}
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <StepBadge n={1} done={canRun} />
-            <h2 className="text-base font-semibold">Choose X-ray Images</h2>
+            <StepBadge n={1} done={canRun && caseId !== null} />
+            <h2 className="text-base font-semibold">Enter Case ID and Choose X-ray Images</h2>
           </div>
           <p className="mt-1 pl-8 text-sm text-muted-foreground">
-            Upload your own AP/LAT images, or select a Grade 2a or Grade 2b
-            example case.
+            Enter the case ID, then upload your own AP/LAT images or select a
+            Grade 2a or Grade 2b example case.
           </p>
 
           <div className="pl-8">
+            <label className="mt-4 block w-full max-w-xl text-sm">
+              <span className="mb-1 block font-medium text-slate-700">
+                Case ID <span className="text-red-600">*</span>
+              </span>
+              <input
+                type="text"
+                value={caseIdInput}
+                onChange={(e) => setCaseIdInput(e.target.value)}
+                placeholder="e.g. KKH-0123"
+                aria-required="true"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                Used as the case identifier in the logs. Required before grading.
+              </span>
+            </label>
             <div
               className="mt-4 grid w-full max-w-xl grid-cols-2 gap-3"
               role="group"
@@ -533,7 +555,9 @@ export default function HomePage() {
               <Button
                 size="lg"
                 onClick={handleRun}
-                disabled={!canRun || loading || loadingDemoId !== null || !preLocked}
+                disabled={
+                  !canRun || !caseId || loading || loadingDemoId !== null || !preLocked
+                }
                 className="gap-2 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
               >
                 {loading ? (

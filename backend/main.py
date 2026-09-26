@@ -72,7 +72,7 @@ def _log_prediction(*, case_id: Optional[str], ap_path: Optional[str],
 
 
 def _case_id(ap_path: Optional[str], lat_path: Optional[str]) -> Optional[str]:
-    """Case identifier built from the uploaded X-ray file path(s)."""
+    """Fallback case identifier built from the uploaded X-ray file path(s)."""
     parts = [p for p in (ap_path, lat_path) if p]
     return " + ".join(parts) or None
 
@@ -133,6 +133,7 @@ async def predict(
     run_sam2: bool = Form(True),
     ap_source_path: Optional[str] = Form(None),
     lat_source_path: Optional[str] = Form(None),
+    case_id: Optional[str] = Form(None),
 ):
     """Run the grading pipeline and return grades + base64 plots.
 
@@ -144,7 +145,9 @@ async def predict(
     run_full_lat_alignment: enable full 6-step LAT alignment
     run_sam2              : enable SAM2 bone segmentation
     ap_source_path / lat_source_path : original client-side file path of each
-        image, used as the case identifier in the log (falls back to filename)
+        image, logged alongside the case (falls back to filename)
+    case_id : reader-entered case identifier for the log (falls back to the
+        file path(s) when not given)
     """
     if ap_file is None and lat_file is None:
         raise HTTPException(status_code=400,
@@ -192,7 +195,7 @@ async def predict(
     ap_log_path = (ap_source_path or ap_file.filename) if ap_file is not None else None
     lat_log_path = (lat_source_path or lat_file.filename) if lat_file is not None else None
     _log_prediction(
-        case_id=_case_id(ap_log_path, lat_log_path),
+        case_id=(case_id or "").strip() or _case_id(ap_log_path, lat_log_path),
         ap_path=ap_log_path,
         lat_path=lat_log_path,
         processing_time_seconds=processing_time_seconds,

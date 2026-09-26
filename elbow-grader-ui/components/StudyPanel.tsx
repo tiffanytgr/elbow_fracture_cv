@@ -44,7 +44,7 @@ interface SummaryRow {
 
 interface StudyPanelProps {
   caseKey: string | null;
-  /** Case identifier, built from the X-ray file path(s). */
+  /** Case identifier entered by the reader; answers are blocked until set. */
   caseId: string | null;
   apPath: string | null;
   latPath: string | null;
@@ -325,15 +325,19 @@ export function StudyPanel({
 
   const disabled = !caseKey;
   const alreadySaved = savedAt !== null;
+  // Answers stay locked until the reader has entered a case ID.
+  const needsCaseId = !caseId && !alreadySaved;
 
   const preComplete = preGrade !== null && preConf !== null;
   const canSubmitGrade =
     !disabled &&
+    !needsCaseId &&
     !gradeSubmitted &&
     decisionGrade !== null &&
     (!isAi || (preLocked && aiRevealed));
   const canSave =
     !disabled &&
+    !needsCaseId &&
     !saving &&
     !alreadySaved &&
     gradeSubmitted &&
@@ -342,7 +346,9 @@ export function StudyPanel({
 
   let hint: string | null = null;
   if (!disabled && !alreadySaved) {
-    if (isAi && !preLocked) {
+    if (needsCaseId) {
+      hint = "Enter a case ID above to start grading.";
+    } else if (isAi && !preLocked) {
       hint = "Lock your pre-AI read first.";
     } else if (isAi && !aiRevealed) {
       hint = gradeSubmitted
@@ -440,14 +446,14 @@ export function StudyPanel({
                 confidence={preConf}
                 onGradeChange={setPreGrade}
                 onConfidenceChange={setPreConf}
-                disabled={preLocked}
+                disabled={preLocked || needsCaseId}
               />
               {!preLocked && (
                 <div className="mt-3">
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={!preComplete}
+                    disabled={!preComplete || needsCaseId}
                     onClick={() => setPreLocked(true)}
                     className="gap-1.5"
                   >
@@ -494,7 +500,7 @@ export function StudyPanel({
                     idPrefix="decision"
                     grade={decisionGrade}
                     onGradeChange={isAi ? setPostGrade : setPreGrade}
-                    disabled={gradeSubmitted}
+                    disabled={gradeSubmitted || needsCaseId}
                   />
                   {!gradeSubmitted && (
                     <div className="mt-3 flex flex-wrap items-center gap-2">

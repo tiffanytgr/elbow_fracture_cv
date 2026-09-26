@@ -72,12 +72,14 @@ starts a new case: the stopwatch, answers, and AI result reset. Adding the
 missing second view to an unsaved case (e.g. the LAT after the AP) completes
 the current case instead; rotating or removing an image never starts a new one.
 
-**Case identifier.** `case_id` is built from the file path of each X-ray
-(`<ap path> + <lat path>`), and `ap_path` / `lat_path` are logged separately.
-Example cases use their bundled path (e.g. `/demo/grade-2a/a145-ap.png`). For
-uploads, browsers do not expose a file's absolute path, so the path is the
-folder-relative path when available and otherwise the file name — keep file
-names unique per case.
+**Case identifier.** Before grading, the reader enters a **Case ID** (required;
+selecting an example case pre-fills it with the example's ID). It is logged as
+`case_id` in both the study log and the backend's `predictions.log`, and the
+field clears after each submitted case. The X-ray file paths are logged
+separately as `ap_path` / `lat_path`: example cases use their bundled path (e.g.
+`/demo/grade-2a/a145-ap.png`); for uploads, browsers do not expose a file's
+absolute path, so it is the folder-relative path when available and otherwise
+the file name.
 
 Both arms share a per-case **stopwatch** that auto-starts when a case loads and
 has a **Pause** button for stepping away. **Submit assessment** appends one
@@ -89,7 +91,7 @@ a remote laptop. Grades use the AI label space (`Normal`, `Grade 1`,
 Each line is a JSON object, e.g.:
 
 ```json
-{"reviewer":"TT","mode":"ai","case_id":"/demo/grade-2a/a145-ap.png + /demo/grade-2a/a145-lat.png","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
+{"reviewer":"TT","mode":"ai","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
 ```
 
 `ai_gartland_grade` is the pipeline's final Gartland grade; `ai_cnn_grade` and
@@ -100,7 +102,7 @@ are `null`. The default location is
 `STUDY_LOG_PATH`.
 
 The backend's `logs/predictions.log` (one line per AI run) uses the same
-path-based `case_id` and also records `gartland_grade`, `cnn_grade` and
+`case_id` (falling back to the file paths if none was sent) and also records `gartland_grade`, `cnn_grade` and
 `geometric_grade`.
 
 `GET /api/study-log` reads the log back:
