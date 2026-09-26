@@ -1,6 +1,4 @@
-// Types and constants for the reader study workflow (control vs AI arm).
-
-export type StudyMode = "ai" | "control";
+// Types and constants for the AI-assisted reader study workflow.
 
 /**
  * Gartland grade options the reader can pick. `value` is stored in the log and

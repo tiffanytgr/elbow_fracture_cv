@@ -22,7 +22,6 @@ function logFilePath(): string {
 
 interface StudyPayload {
   reviewer?: string | null;
-  mode?: string | null; // "ai" | "control"
   case_id?: string | null;
   ap_path?: string | null;
   lat_path?: string | null;
@@ -92,7 +91,6 @@ const RAW_COLUMNS = [
   "started_at",
   "ended_at",
   "reviewer",
-  "mode",
   "case_id",
   "ap_path",
   "lat_path",
@@ -232,7 +230,7 @@ function csvResponse(body: string, filename: string): NextResponse {
 /**
  * POST /api/study-log
  * Appends one study record as a JSON line to the local log file.
- * Requires mode and elapsed_seconds; a pre-AI grade is required for every arm.
+ * Requires elapsed_seconds plus the pre-AI and post-AI grades.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -249,15 +247,9 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (body.mode !== "ai" && body.mode !== "control") {
+    if (!body.pre_grade || !body.post_grade) {
       return NextResponse.json(
-        { error: "mode is required and must be 'ai' or 'control'" },
-        { status: 400 },
-      );
-    }
-    if (!body.pre_grade) {
-      return NextResponse.json(
-        { error: "pre_grade is required" },
+        { error: "pre_grade and post_grade are required" },
         { status: 400 },
       );
     }
@@ -268,24 +260,19 @@ export async function POST(req: NextRequest) {
 
     const entry = {
       reviewer: body.reviewer?.trim() || null,
-      mode: body.mode,
       case_id: body.case_id ?? null,
       ap_path: body.ap_path ?? null,
       lat_path: body.lat_path ?? null,
       input_mode: body.input_mode ?? null,
       pre_grade: body.pre_grade,
       pre_confidence: num(body.pre_confidence),
-      // Post-AI answer only applies to the AI arm.
-      post_grade: body.mode === "ai" ? body.post_grade ?? null : null,
-      post_confidence: body.mode === "ai" ? num(body.post_confidence) : null,
-      ai_gartland_grade:
-        body.mode === "ai" ? body.ai_gartland_grade ?? null : null,
-      ai_cnn_grade: body.mode === "ai" ? body.ai_cnn_grade ?? null : null,
-      ai_geometric_grade:
-        body.mode === "ai" ? body.ai_geometric_grade ?? null : null,
-      ai_confidence: body.mode === "ai" ? num(body.ai_confidence) : null,
-      ai_processing_time_seconds:
-        body.mode === "ai" ? num(body.ai_processing_time_seconds) : null,
+      post_grade: body.post_grade,
+      post_confidence: num(body.post_confidence),
+      ai_gartland_grade: body.ai_gartland_grade ?? null,
+      ai_cnn_grade: body.ai_cnn_grade ?? null,
+      ai_geometric_grade: body.ai_geometric_grade ?? null,
+      ai_confidence: num(body.ai_confidence),
+      ai_processing_time_seconds: num(body.ai_processing_time_seconds),
       notes: body.notes?.trim() || null,
       decision_started_at: body.decision_started_at ?? null,
       grade_submitted_at: body.grade_submitted_at ?? null,
@@ -320,7 +307,7 @@ export async function POST(req: NextRequest) {
  *   ?format=csv               → all records as a CSV download
  *   ?summary=1[&group_by=…]   → grouped timing stats as JSON
  *   ?summary=1&format=csv     → grouped stats as a CSV download
- * group_by defaults to mode (study arm); reviewer / pre_grade / input_mode also work.
+ * group_by defaults to reviewer; pre_grade / post_grade / input_mode also work.
  */
 export async function GET(req: NextRequest) {
   const filePath = logFilePath();
@@ -328,7 +315,7 @@ export async function GET(req: NextRequest) {
   const format = params.get("format");
   const wantSummary =
     params.get("summary") === "1" || params.get("summary") === "true";
-  const groupBy = params.get("group_by") || "mode";
+  const groupBy = params.get("group_by") || "reviewer";
 
   try {
     const entries = await readEntries(filePath);

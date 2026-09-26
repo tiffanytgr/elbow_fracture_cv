@@ -35,7 +35,6 @@ import { GeometricTab } from "@/components/tabs/GeometricTab";
 import { CorticalWidthTab } from "@/components/tabs/CorticalWidthTab";
 import { ReportGenerator } from "@/components/ReportGenerator";
 import type { GraderConfig, PredictResponse } from "@/lib/types";
-import type { StudyMode } from "@/lib/studyTypes";
 
 const DEFAULT_CONFIG: GraderConfig = {
   confidenceThreshold: 0.7,
@@ -118,8 +117,6 @@ export default function HomePage() {
       ? `demo:${selectedDemoId}:${demoVersion}`
       : `upload:${uploadCaseSeq}`;
 
-  // The app runs the AI-assisted workflow only; logged records keep mode "ai".
-  const mode: StudyMode = "ai";
   const aiRevealed = result !== null && !resultIsStale;
 
   // Restore the reviewer from a previous session.
@@ -469,7 +466,6 @@ export default function HomePage() {
           latPath={latPath}
           inputMode={inputMode}
           reviewer={reviewer}
-          mode={mode}
           aiRevealed={aiRevealed}
           aiGartlandGrade={aiRevealed ? result?.final_grade ?? null : null}
           aiCnnGrade={aiRevealed ? result?.cnn_grade ?? null : null}
