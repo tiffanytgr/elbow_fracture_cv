@@ -44,7 +44,6 @@ const DEFAULT_CONFIG: GraderConfig = {
 };
 
 const REVIEWER_STORAGE_KEY = "elbow-grader-reviewer";
-const MODE_STORAGE_KEY = "elbow-grader-mode";
 
 function StepBadge({ n, done }: { n: number; done: boolean }) {
   return (
@@ -85,7 +84,6 @@ export default function HomePage() {
 
   // Study-session state.
   const [reviewer, setReviewer] = useState("");
-  const [mode, setMode] = useState<StudyMode>("ai");
   const [preLocked, setPreLocked] = useState(false);
   const [savedCaseKey, setSavedCaseKey] = useState<string | null>(null);
 
@@ -120,45 +118,31 @@ export default function HomePage() {
       ? `demo:${selectedDemoId}:${demoVersion}`
       : `upload:${uploadCaseSeq}`;
 
-  const isControl = mode === "control";
-  // A case is "in progress" once loaded and until it has been saved; the study
-  // arm is locked during this window so it can't be flipped mid-case.
-  const caseInProgress = caseKey !== null && caseKey !== savedCaseKey;
-  const aiRevealed = !isControl && result !== null && !resultIsStale;
+  // The app runs the AI-assisted workflow only; logged records keep mode "ai".
+  const mode: StudyMode = "ai";
+  const aiRevealed = result !== null && !resultIsStale;
 
-  // Restore reviewer + arm from a previous session.
+  // Restore the reviewer from a previous session.
   useEffect(() => {
     try {
       const storedReviewer = window.localStorage.getItem(REVIEWER_STORAGE_KEY);
       if (storedReviewer) setReviewer(storedReviewer);
-      const storedMode = window.localStorage.getItem(MODE_STORAGE_KEY);
-      if (storedMode === "ai" || storedMode === "control") setMode(storedMode);
     } catch {
       /* localStorage may be unavailable */
     }
   }, []);
 
-  // Clear any AI result whenever a new case loads or the arm changes, so the
+  // Clear any AI result whenever a new case loads, so the
   // post-AI read always waits for a fresh analysis of the current case.
   useEffect(() => {
     setResult(null);
     setError(null);
-  }, [caseKey, mode]);
+  }, [caseKey]);
 
   function persistReviewer(next: string) {
     setReviewer(next);
     try {
       window.localStorage.setItem(REVIEWER_STORAGE_KEY, next.trim());
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function changeMode(next: StudyMode) {
-    if (caseInProgress || next === mode) return;
-    setMode(next);
-    try {
-      window.localStorage.setItem(MODE_STORAGE_KEY, next);
     } catch {
       /* ignore */
     }
@@ -246,7 +230,7 @@ export default function HomePage() {
   }
 
   async function handleRun() {
-    if (!canRun || loadingDemoId !== null || isControl || !preLocked) return;
+    if (!canRun || loadingDemoId !== null || !preLocked) return;
     const submittedInputKey = currentInputKey;
     const submittedHasLat = latFile !== null;
     setLoading(true);
@@ -287,23 +271,21 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] lg:flex">
-      {/* Sidebar — hidden in the control arm so no AI settings/telemetry show */}
-      {!isControl && (
-        <Sidebar
-          modelStatus={result?.model_status ?? null}
-          config={config}
-          result={result}
-          onConfigChange={(nextConfig) => {
-            setConfig(nextConfig);
-            setConfigVersion((version) => version + 1);
-          }}
-          device={
-            result?.config_snapshot
-              ? String((result.config_snapshot as Record<string, unknown>)["device"] ?? "")
-              : undefined
-          }
-        />
-      )}
+      {/* Sidebar */}
+      <Sidebar
+        modelStatus={result?.model_status ?? null}
+        config={config}
+        result={result}
+        onConfigChange={(nextConfig) => {
+          setConfig(nextConfig);
+          setConfigVersion((version) => version + 1);
+        }}
+        device={
+          result?.config_snapshot
+            ? String((result.config_snapshot as Record<string, unknown>)["device"] ?? "")
+            : undefined
+        }
+      />
 
       {/* Main content */}
       <main className="min-w-0 flex-1 space-y-4 p-4 sm:p-6 lg:p-5 xl:p-6">
@@ -322,7 +304,7 @@ export default function HomePage() {
               Paediatric Elbow Fracture Grader
             </h1>
             <p className="mt-2 text-sm font-medium text-white/90 sm:text-base">
-              Gartland classification reader study — AI-assisted and control arms
+              Gartland classification reader study — AI-assisted grading
             </p>
             <div className="mt-4">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/20 bg-blue-500/60 px-3 py-1.5 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
@@ -333,70 +315,24 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Study session — reviewer + arm, locked once a case is in progress */}
+        {/* Study session — reviewer */}
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5 text-blue-600" />
             <h2 className="text-base font-semibold">Study Session</h2>
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-700">
-                Reviewer
-              </span>
-              <input
-                type="text"
-                value={reviewer}
-                onChange={(e) => persistReviewer(e.target.value)}
-                placeholder="Your name or initials"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </label>
-            <div className="text-sm">
-              <span className="mb-1 block font-medium text-slate-700">
-                Study arm
-              </span>
-              <div
-                className="grid grid-cols-2 gap-2"
-                role="group"
-                aria-label="Study arm"
-              >
-                <button
-                  type="button"
-                  onClick={() => changeMode("ai")}
-                  disabled={caseInProgress}
-                  aria-pressed={mode === "ai"}
-                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    mode === "ai"
-                      ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                      : "border-slate-300 bg-white text-slate-700 hover:border-blue-300"
-                  }`}
-                >
-                  AI-assisted
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeMode("control")}
-                  disabled={caseInProgress}
-                  aria-pressed={mode === "control"}
-                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    mode === "control"
-                      ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                      : "border-slate-300 bg-white text-slate-700 hover:border-blue-300"
-                  }`}
-                >
-                  Control (no AI)
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {caseInProgress
-                  ? "Arm is locked while a case is in progress. Submit the assessment to change it."
-                  : isControl
-                    ? "Control arm: images only, no AI output. One read per case."
-                    : "AI-assisted arm: record your read before and after seeing the AI."}
-              </p>
-            </div>
-          </div>
+          <label className="mt-4 block w-full max-w-xl text-sm">
+            <span className="mb-1 block font-medium text-slate-700">
+              Reviewer
+            </span>
+            <input
+              type="text"
+              value={reviewer}
+              onChange={(e) => persistReviewer(e.target.value)}
+              placeholder="Your name or initials"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </label>
         </section>
 
         {/* Step 1 — Choose images */}
@@ -547,50 +483,48 @@ export default function HomePage() {
           onSaved={handleSaved}
         />
 
-        {/* Step 2 — Analyse (AI arm only) */}
-        {!isControl && (
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <StepBadge n={2} done={result !== null} />
-              <h2 className="text-base font-semibold">Run AI Analysis</h2>
-            </div>
+        {/* Step 2 — Analyse */}
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <StepBadge n={2} done={result !== null} />
+            <h2 className="text-base font-semibold">Run AI Analysis</h2>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-4 pl-8">
-              <Button
-                size="lg"
-                onClick={handleRun}
-                disabled={
-                  !canRun || !caseId || loading || loadingDemoId !== null || !preLocked
-                }
-                className="gap-2 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Play className="w-4 h-4" />
-                )}
-                {loading ? "Analysing…" : "Analyse X-rays"}
-              </Button>
-              {!canRun && (
-                <p className="text-sm text-muted-foreground">
-                  {inputMode === "demo"
-                    ? "Select a case to enable analysis."
-                    : "Upload at least one X-ray to enable analysis."}
-                </p>
+          <div className="flex flex-wrap items-center gap-4 pl-8">
+            <Button
+              size="lg"
+              onClick={handleRun}
+              disabled={
+                !canRun || !caseId || loading || loadingDemoId !== null || !preLocked
+              }
+              className="gap-2 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4" />
               )}
-              {canRun && !preLocked && (
-                <p className="text-sm text-amber-700">
-                  Lock your pre-AI read above before running the analysis.
-                </p>
-              )}
-              {loading && (
-                <p className="text-sm text-muted-foreground animate-pulse">
-                  First run loads AI models — allow 30–60 s…
-                </p>
-              )}
-            </div>
-          </section>
-        )}
+              {loading ? "Analysing…" : "Analyse X-rays"}
+            </Button>
+            {!canRun && (
+              <p className="text-sm text-muted-foreground">
+                {inputMode === "demo"
+                  ? "Select a case to enable analysis."
+                  : "Upload at least one X-ray to enable analysis."}
+              </p>
+            )}
+            {canRun && !preLocked && (
+              <p className="text-sm text-amber-700">
+                Lock your pre-AI read above before running the analysis.
+              </p>
+            )}
+            {loading && (
+              <p className="text-sm text-muted-foreground animate-pulse">
+                First run loads AI models — allow 30–60 s…
+              </p>
+            )}
+          </div>
+        </section>
 
         {/* Error */}
         {error && (
@@ -599,8 +533,8 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Step 3 — Results (AI arm only) */}
-        {!isControl && result && (
+        {/* Step 3 — Results */}
+        {result && (
           <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">

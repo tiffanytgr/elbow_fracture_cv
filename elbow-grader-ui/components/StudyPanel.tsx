@@ -381,9 +381,6 @@ export function StudyPanel({
           <TimerIcon className="h-5 w-5 text-blue-600" />
           <h2 className="text-base font-semibold">
             Reader Assessment
-            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-              {isAi ? "AI-assisted arm" : "Control arm"}
-            </span>
           </h2>
         </div>
         <div className="flex items-center gap-3">
