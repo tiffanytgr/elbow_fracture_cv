@@ -9,7 +9,7 @@ still in the document, renumbered or relocated.
 - **Yellow highlighted `[[FILL: ... ]]`** — a value, sentence or figure file
   that still has to be supplied. 43 in the body, 37 in tables. Search for
   `[[FILL` in Word to step through them.
-- **Word comments (38)** — one on every section, table and figure that was
+- **Word comments (39)** — one on every section, table and figure that was
   added, edited, renumbered or moved, saying what changed and why. Turn on
   *Review → All Markup* to see them in the margin.
 
@@ -148,7 +148,7 @@ word and I will move it.
 ## Checks run
 
 - All 24 images in the original are present in the revised document.
-- 38 Word comments, all correctly anchored (ranges, references and definitions
+- 39 Word comments, all correctly anchored (ranges, references and definitions
   all match); every image relationship resolves; every XML part is well-formed.
 - No stale numeric figure references remain in the body text.
 - Figures and tables are cited in ascending order.
@@ -156,3 +156,42 @@ word and I will move it.
 LibreOffice in this container cannot open either the original or the revised
 file, so the document was validated structurally rather than visually. Please
 open it in Word and skim the figure placements before sending it on.
+
+---
+
+## Figure inventory — nothing is missing
+
+Audited after the edit: all 24 images from the original are present and each
+sits under the right caption. Five slots are empty by design, because they are
+the figures the scripts generate.
+
+| Slot | Image | Note |
+|---|---|---|
+| Figure 1 | **to generate** | `fig1_pipeline.py`. Panel A is drawn in code; panels B and C need exported radiographs. |
+| Figure 2 | **to generate** | `fig2_classification.py`. Needs the two prediction CSVs. |
+| Figure 3 | **to generate** | `fig3_uncertainty.py`. Needs `uncertainty.csv` and `ablation.csv`. |
+| Figure 4 | **to generate** | `fig4_anatomy.py`. Panels A–C reuse the Appendix S2 images. |
+| Figure S1 | present | old Figure 11 |
+| Figure S2 | present | old Figure 10; panel B for the baseline still to add |
+| Figure S3 | present | old Figure 12 |
+| Figure S4 | **to generate** | `appendix_figures.py --only s4` |
+| Figure S5A–C | present (6 images) | the three failure cases, renumbered in §S1.4 |
+| Figure S6 | present | old Figure 1 |
+| Figure S7 | present (2) | old Figures 4 + 5 |
+| Figure S8 | present | old Figure 9 |
+| Figure S9 | present (3) | old Figures 13 + 14 |
+| Appendix S2 | present (4) | old Figures 2, 6, 7, 8 — source panels |
+
+The lateral standardisation strip (old Figure 3, four images) stays in §2.4,
+where the standardisation it illustrates is described. Its caption is in a Word
+text box, so it was relabelled in place rather than moved. Export its five
+sub-images for Figure 1C, then delete the strip once Figure 1 is final,
+otherwise it duplicates that panel.
+
+### Verification run on the final file
+
+- 24 of 24 original images present; none left loose in Chapter 3.
+- No body prose lost. The 44 original text blocks that do not match verbatim
+  are all headings, captions and figure-list rows that were deliberately
+  renumbered or rewritten.
+- 39 Word comments, all correctly anchored; every XML part well-formed.
