@@ -20,6 +20,18 @@ research/
 └── figures/               the four main figures and the supplements
 ```
 
+## Verify the setup first
+
+```bash
+bash research/smoke_test.sh
+```
+
+Runs the whole chain — manifest, both architectures, evaluation with coverage
+filtering, the paired comparison, and two figures — on 45 synthetic noise
+images, in about a minute on CPU. It checks that the code runs and that the
+artefacts connect to each other, not that anything learns. Worth running before
+committing GPU time.
+
 ## Install
 
 The two halves have different requirements on purpose: the figure scripts have
