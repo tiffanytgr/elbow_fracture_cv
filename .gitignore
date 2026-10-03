@@ -54,3 +54,6 @@ Thumbs.db
 
 # TypeScript incremental build info
 elbow-grader-ui/tsconfig.tsbuildinfo
+
+# Research outputs (figures, manifests, checkpoints, metrics)
+research/outputs/

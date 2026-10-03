@@ -32,9 +32,17 @@ KKH_Elbow/
 ├── pipeline/             # Internal ML pipeline (config, inference, alignment, SAM2)
 ├── backend/              # FastAPI server
 ├── elbow-grader-ui/      # Next.js frontend
+├── research/             # Manuscript code: multiclass baseline + paper figures
 ├── experiments/          # Model weights (downloaded separately)
 └── pyproject.toml        # Python package config
 ```
+
+## Research code
+
+`research/` holds the manuscript material, kept out of the inference path: an
+end-to-end 5-class baseline (paired AP+LAT → Gartland grade) that serves as the
+comparison arm for the cascade, and the scripts that render the paper's panel
+figures. See [research/README.md](research/README.md).
 ## Getting Started
 
 ```bash
