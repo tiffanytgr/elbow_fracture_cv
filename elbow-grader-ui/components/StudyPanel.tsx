@@ -16,7 +16,6 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   ConfidencePicker,
-  GradeConfidenceForm,
   GradePicker,
 } from "@/components/GradeConfidenceForm";
 import type { ConfidenceLevel } from "@/lib/studyTypes";
@@ -26,6 +25,7 @@ interface RecentEntry {
   case_id: string | null;
   pre_grade: string | null;
   post_grade: string | null;
+  pre_grade_time_seconds: number | null;
   grade_time_seconds: number | null;
   decision_time_seconds: number | null;
   elapsed_hms: string;
@@ -38,6 +38,8 @@ interface SummaryRow {
   mean_seconds: number;
   median_seconds: number;
   total_seconds: number;
+  mean_pre_grade_seconds: number | null;
+  median_pre_grade_seconds: number | null;
   mean_decision_seconds: number | null;
   median_decision_seconds: number | null;
   mean_grade_seconds: number | null;
@@ -108,6 +110,10 @@ export function StudyPanel({
   const [preGrade, setPreGrade] = useState<string | null>(null);
   const [preConf, setPreConf] = useState<ConfidenceLevel | null>(null);
   const [preLocked, setPreLocked] = useState(false);
+  // Control arm: the reader submits the pre-AI grade on its own, which records
+  // the time from when the X-ray appeared (case load) to that submission.
+  const [preGradeSubmitted, setPreGradeSubmitted] = useState(false);
+  const [preGradeSeconds, setPreGradeSeconds] = useState<number | null>(null);
   const [postGrade, setPostGrade] = useState<string | null>(null);
   const [postConf, setPostConf] = useState<ConfidenceLevel | null>(null);
   const [comments, setComments] = useState("");
@@ -201,6 +207,8 @@ export function StudyPanel({
     setPreGrade(null);
     setPreConf(null);
     setPreLocked(false);
+    setPreGradeSubmitted(false);
+    setPreGradeSeconds(null);
     setPostGrade(null);
     setPostConf(null);
     setComments("");
@@ -253,6 +261,16 @@ export function StudyPanel({
   }
 
   /**
+   * Control submission: record the pre-AI grade time — from X-ray shown
+   * (case load) to this click — before any AI output is revealed.
+   */
+  function submitPreGrade() {
+    if (preGrade === null || preGradeSubmitted || needsCaseId || preLocked) return;
+    setPreGradeSeconds(Math.max(0, currentElapsedMs() / 1000));
+    setPreGradeSubmitted(true);
+  }
+
+  /**
    * Submit 1: lock the decision grade and record timings. `gradeSeconds` is
    * the stopwatch reading — the time from X-ray upload (case load) to this
    * submission; `decisionSeconds` is the slice of that since the AI appeared.
@@ -302,6 +320,7 @@ export function StudyPanel({
           ai_confidence: aiConfidence,
           ai_processing_time_seconds: aiProcessingSeconds,
           notes: comments,
+          pre_grade_time_seconds: preGradeSeconds,
           grade_time_seconds: gradeSeconds,
           decision_time_seconds: decisionSeconds,
           decision_started_at: decisionStartedAtRef.current,
@@ -333,7 +352,9 @@ export function StudyPanel({
   // Answers stay locked until the reader has entered a case ID.
   const needsCaseId = !caseId && !alreadySaved;
 
-  const preComplete = preGrade !== null && preConf !== null;
+  // The pre-AI read is ready to lock once its grade is submitted (control
+  // time recorded) and a confidence has been chosen.
+  const preReady = preGradeSubmitted && preConf !== null;
   const canSubmitGrade =
     !disabled &&
     !needsCaseId &&
@@ -355,7 +376,11 @@ export function StudyPanel({
     if (needsCaseId) {
       hint = "Enter a case ID above to start grading.";
     } else if (!preLocked) {
-      hint = "Lock your pre-AI read first.";
+      hint = !preGradeSubmitted
+        ? "Submit your pre-AI grade, then rate confidence and lock."
+        : !preConf
+          ? "Rate your pre-AI confidence, then lock."
+          : "Lock your pre-AI read to reveal the AI analysis.";
     } else if (!aiRevealed) {
       hint = gradeSubmitted
         ? "AI result is out of date — re-run the analysis to submit."
@@ -438,20 +463,46 @@ export function StudyPanel({
                 </span>
               )}
             </div>
-            <GradeConfidenceForm
-              idPrefix="pre"
-              grade={preGrade}
-              confidence={preConf}
-              onGradeChange={setPreGrade}
-              onConfidenceChange={setPreConf}
-              disabled={preLocked || needsCaseId}
-            />
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <GradePicker
+                  idPrefix="pre"
+                  grade={preGrade}
+                  onGradeChange={setPreGrade}
+                  disabled={preLocked || needsCaseId || preGradeSubmitted}
+                />
+                {!preGradeSubmitted ? (
+                  <Button
+                    size="sm"
+                    onClick={submitPreGrade}
+                    disabled={preGrade === null || needsCaseId || preLocked}
+                    className="gap-1.5 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
+                  >
+                    <Send className="h-4 w-4" />
+                    Submit
+                  </Button>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800">
+                    <Check className="h-3.5 w-3.5" />
+                    {preGradeSeconds !== null
+                      ? `${formatSeconds(preGradeSeconds)} to grade`
+                      : "Submitted"}
+                  </span>
+                )}
+              </div>
+              <ConfidencePicker
+                idPrefix="pre"
+                confidence={preConf}
+                onConfidenceChange={setPreConf}
+                disabled={preLocked || needsCaseId}
+              />
+            </div>
             {!preLocked && (
               <div className="mt-3">
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={!preComplete || needsCaseId}
+                  disabled={!preReady || needsCaseId}
                   onClick={() => setPreLocked(true)}
                   className="gap-1.5"
                 >
@@ -459,7 +510,9 @@ export function StudyPanel({
                   Lock pre-AI read
                 </Button>
                 <span className="ml-2 text-xs text-slate-500">
-                  Locking reveals the AI analysis; the pre-AI answer can’t be changed afterwards.
+                  {preGradeSubmitted
+                    ? "Locking reveals the AI analysis; the pre-AI answer can’t be changed afterwards."
+                    : "Submit your pre-AI grade above to record the control time."}
                 </span>
               </div>
             )}
@@ -634,6 +687,8 @@ export function StudyPanel({
                     <th className="px-3 py-2 text-right font-semibold">Mean</th>
                     <th className="px-3 py-2 text-right font-semibold">Median</th>
                     <th className="px-3 py-2 text-right font-semibold">Total</th>
+                    <th className="px-3 py-2 text-right font-semibold">Mean pre-AI grade</th>
+                    <th className="px-3 py-2 text-right font-semibold">Median pre-AI grade</th>
                     <th className="px-3 py-2 text-right font-semibold">Mean grade time</th>
                     <th className="px-3 py-2 text-right font-semibold">Median grade time</th>
                     <th className="px-3 py-2 text-right font-semibold">Mean decision</th>
@@ -665,6 +720,16 @@ export function StudyPanel({
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {formatSeconds(row.total_seconds)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {row.mean_pre_grade_seconds !== null
+                            ? formatSeconds(row.mean_pre_grade_seconds)
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {row.median_pre_grade_seconds !== null
+                            ? formatSeconds(row.median_pre_grade_seconds)
+                            : "—"}
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {row.mean_grade_seconds !== null
@@ -710,6 +775,9 @@ export function StudyPanel({
                   </span>{" "}
                   · {entry.case_id ?? "—"}
                   {entry.pre_grade ? ` · pre ${entry.pre_grade}` : ""}
+                  {typeof entry.pre_grade_time_seconds === "number"
+                    ? ` (${formatSeconds(entry.pre_grade_time_seconds)})`
+                    : ""}
                   {entry.post_grade ? ` → post ${entry.post_grade}` : ""}
                   {typeof entry.grade_time_seconds === "number"
                     ? ` · grade in ${formatSeconds(entry.grade_time_seconds)}`

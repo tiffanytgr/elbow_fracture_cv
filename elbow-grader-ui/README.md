@@ -44,11 +44,13 @@ Set `BACKEND_URL` in `.env.local` to point at a remote backend.
 ## Reader study: timer and answer capture
 
 The page runs as an AI-assisted reader-study tool. The reader enters their name
-in the **Study Session** bar, records a grade + confidence **before** the AI is
-shown, locks it, runs the AI analysis, reviews it (Grad-CAM, Baumann, AHL, bone
-profile), then records a **post-AI** read in two steps (below). The Analyse
-button stays disabled until the pre-AI read is locked, and the AI result is only
-revealed afterwards.
+in the **Study Session** bar, records a grade **before** the AI is shown and
+**Submit**s it — this captures the control timing, `pre_grade_time_seconds`, the
+time from when the X-ray appeared (case load) to that submission — then rates
+confidence and locks the pre-AI read, runs the AI analysis, reviews it (Grad-CAM,
+Baumann, AHL, bone profile), and records a **post-AI** read in two steps (below).
+The Analyse button stays disabled until the pre-AI read is locked, and the AI
+result is only revealed afterwards.
 
 The decision read is submitted in two steps:
 
@@ -86,7 +88,7 @@ a remote laptop. Grades use the AI label space (`Normal`, `Grade 1`,
 Each line is a JSON object, e.g.:
 
 ```json
-{"reviewer":"TT","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"ai_processing_time_seconds":7.3,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","grade_time_seconds":41.7,"decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
+{"reviewer":"TT","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"pre_grade_time_seconds":18.9,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"ai_processing_time_seconds":7.3,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","grade_time_seconds":41.7,"decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
 ```
 
 `ai_gartland_grade` is the pipeline's final Gartland grade; `ai_cnn_grade` and
@@ -107,7 +109,7 @@ The backend's `logs/predictions.log` (one line per AI run) uses the same
 |---|---|
 | `?limit=N` | N most recent records as JSON (shown under "Recently logged") |
 | `?format=csv` | Every record as a CSV download |
-| `?summary=1` | Grouped timing stats (count, mean/median/min/max/total seconds, mean/median grade time, mean/median decision time) as JSON |
+| `?summary=1` | Grouped timing stats (count, mean/median/min/max/total seconds, mean/median pre-AI grade time, mean/median grade time, mean/median decision time) as JSON |
 | `?summary=1&format=csv` | The same grouped stats as a CSV download |
 | `&group_by=…` | Grouping field for the summary — `reviewer` (default), `pre_grade`, `post_grade`, or `input_mode` |
 
