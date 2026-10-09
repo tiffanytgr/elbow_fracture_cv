@@ -23,6 +23,7 @@ import type { ConfidenceLevel } from "@/lib/studyTypes";
 interface RecentEntry {
   reviewer: string | null;
   case_id: string | null;
+  arm: string | null;
   pre_grade: string | null;
   post_grade: string | null;
   pre_grade_time_seconds: number | null;
@@ -285,9 +286,14 @@ export function StudyPanel({
     setGradeSubmitted(true);
   }
 
-  /** Submit 2: confidence + follow-up answers; writes the case to the log. */
-  async function saveCase() {
-    if (!caseKey || !canSave) return;
+  /**
+   * Write the case to the log. `arm` is "ai" for the AI-assisted flow
+   * (Submit 2: post-AI grade + confidence) or "control" for the no-AI flow,
+   * where only the pre-AI read is recorded and the AI is never run.
+   */
+  async function submitAssessment(arm: "ai" | "control") {
+    if (!caseKey) return;
+    if (arm === "ai" ? !canSave : !canSaveControl) return;
     setSaving(true);
     setSaveError(null);
 
@@ -300,6 +306,7 @@ export function StudyPanel({
     setElapsedMs(accumulatedRef.current);
     setRunning(false);
 
+    const isControl = arm === "control";
     try {
       const res = await fetch("/api/study-log", {
         method: "POST",
@@ -310,21 +317,23 @@ export function StudyPanel({
           ap_path: apPath,
           lat_path: latPath,
           input_mode: inputMode,
+          arm,
           pre_grade: preGrade,
           pre_confidence: preConf,
-          post_grade: postGrade,
-          post_confidence: postConf,
-          ai_gartland_grade: aiGartlandGrade,
-          ai_cnn_grade: aiCnnGrade,
-          ai_geometric_grade: aiGeometricGrade,
-          ai_confidence: aiConfidence,
-          ai_processing_time_seconds: aiProcessingSeconds,
+          // Control records carry only the pre-AI read; no AI is run.
+          post_grade: isControl ? null : postGrade,
+          post_confidence: isControl ? null : postConf,
+          ai_gartland_grade: isControl ? null : aiGartlandGrade,
+          ai_cnn_grade: isControl ? null : aiCnnGrade,
+          ai_geometric_grade: isControl ? null : aiGeometricGrade,
+          ai_confidence: isControl ? null : aiConfidence,
+          ai_processing_time_seconds: isControl ? null : aiProcessingSeconds,
           notes: comments,
           pre_grade_time_seconds: preGradeSeconds,
-          grade_time_seconds: gradeSeconds,
-          decision_time_seconds: decisionSeconds,
-          decision_started_at: decisionStartedAtRef.current,
-          grade_submitted_at: gradeSubmittedAtRef.current,
+          grade_time_seconds: isControl ? null : gradeSeconds,
+          decision_time_seconds: isControl ? null : decisionSeconds,
+          decision_started_at: isControl ? null : decisionStartedAtRef.current,
+          grade_submitted_at: isControl ? null : gradeSubmittedAtRef.current,
           elapsed_seconds: elapsedSeconds,
           started_at: startedAtRef.current,
           ended_at: new Date().toISOString(),
@@ -370,6 +379,15 @@ export function StudyPanel({
     gradeSubmitted &&
     postConf !== null &&
     aiRevealed;
+  // Control arm: save the pre-AI read directly, without running the AI. Only
+  // available before the pre-AI read is locked (locking starts the AI flow).
+  const canSaveControl =
+    !disabled &&
+    !needsCaseId &&
+    !saving &&
+    !alreadySaved &&
+    !preLocked &&
+    preReady;
 
   let hint: string | null = null;
   if (!disabled && !alreadySaved) {
@@ -498,21 +516,35 @@ export function StudyPanel({
               />
             </div>
             {!preLocked && (
-              <div className="mt-3">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!preReady || needsCaseId}
-                  onClick={() => setPreLocked(true)}
-                  className="gap-1.5"
-                >
-                  <Lock className="h-4 w-4" />
-                  Lock pre-AI read
-                </Button>
-                <span className="ml-2 text-xs text-slate-500">
-                  {preGradeSubmitted
-                    ? "Locking reveals the AI analysis; the pre-AI answer can’t be changed afterwards."
-                    : "Submit your pre-AI grade above to record the control time."}
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!preReady || needsCaseId}
+                    onClick={() => setPreLocked(true)}
+                    className="gap-1.5"
+                  >
+                    <Lock className="h-4 w-4" />
+                    Lock &amp; run AI
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!canSaveControl}
+                    onClick={() => submitAssessment("control")}
+                    className="gap-1.5 border-amber-300 text-amber-800 hover:border-amber-400 hover:bg-amber-50"
+                  >
+                    <Send className="h-4 w-4" />
+                    {saving ? "Submitting…" : "Submit without AI (control)"}
+                  </Button>
+                </div>
+                <span className="block text-xs text-slate-500">
+                  {!preGradeSubmitted
+                    ? "Submit your pre-AI grade above to record the control time."
+                    : !preConf
+                      ? "Rate your pre-AI confidence to continue."
+                      : "Lock to reveal the AI analysis, or submit now as a control case (no AI)."}
                 </span>
               </div>
             )}
@@ -605,7 +637,7 @@ export function StudyPanel({
               <div className="mt-4">
                 <Button
                   size="sm"
-                  onClick={saveCase}
+                  onClick={() => submitAssessment("ai")}
                   disabled={!canSave}
                   className="gap-1.5 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
                 >
@@ -774,6 +806,7 @@ export function StudyPanel({
                     {entry.elapsed_hms}
                   </span>{" "}
                   · {entry.case_id ?? "—"}
+                  {entry.arm === "control" ? " · control" : ""}
                   {entry.pre_grade ? ` · pre ${entry.pre_grade}` : ""}
                   {typeof entry.pre_grade_time_seconds === "number"
                     ? ` (${formatSeconds(entry.pre_grade_time_seconds)})`

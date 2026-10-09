@@ -64,6 +64,13 @@ The decision read is submitted in two steps:
    the follow-up questions (currently an optional comments box), and submits.
    This saves the case.
 
+**Control arm (no AI).** After the pre-AI grade is submitted and confidence
+rated, the reader can instead click **Submit without AI (control)** to save the
+case straight from the pre-AI read, without locking, running the analysis, or
+the post-AI steps. Control records store only the pre-AI read (`pre_grade`,
+`pre_confidence`, `pre_grade_time_seconds`) with the post-AI and `ai_*` fields
+null, and are tagged `arm: "control"` (AI-assisted records are `arm: "ai"`).
+
 **Cases.** Uploading new X-ray images (or selecting another example case)
 starts a new case: the stopwatch, answers, and AI result reset. Adding the
 missing second view to an unsaved case (e.g. the LAT after the AP) completes
@@ -88,7 +95,7 @@ a remote laptop. Grades use the AI label space (`Normal`, `Grade 1`,
 Each line is a JSON object, e.g.:
 
 ```json
-{"reviewer":"TT","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"pre_grade_time_seconds":18.9,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"ai_processing_time_seconds":7.3,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","grade_time_seconds":41.7,"decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
+{"reviewer":"TT","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","arm":"ai","pre_grade":"Grade 2a","pre_confidence":3,"pre_grade_time_seconds":18.9,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"ai_processing_time_seconds":7.3,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","grade_time_seconds":41.7,"decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
 ```
 
 `ai_gartland_grade` is the pipeline's final Gartland grade; `ai_cnn_grade` and
@@ -111,7 +118,7 @@ The backend's `logs/predictions.log` (one line per AI run) uses the same
 | `?format=csv` | Every record as a CSV download |
 | `?summary=1` | Grouped timing stats (count, mean/median/min/max/total seconds, mean/median pre-AI grade time, mean/median grade time, mean/median decision time) as JSON |
 | `?summary=1&format=csv` | The same grouped stats as a CSV download |
-| `&group_by=…` | Grouping field for the summary — `reviewer` (default), `pre_grade`, `post_grade`, or `input_mode` |
+| `&group_by=…` | Grouping field for the summary — `reviewer` (default), `arm`, `pre_grade`, `post_grade`, or `input_mode` |
 
 The summary always includes an `ALL` row alongside the per-group rows. The UI
 exposes **Download log (CSV)**, **Summary (CSV)**, and an inline summary table.
