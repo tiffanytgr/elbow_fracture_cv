@@ -52,10 +52,12 @@ revealed afterwards.
 
 The decision read is submitted in two steps:
 
-1. **Submit grade** — the reader picks a Gartland grade and submits it. This
-   stops the **decision time** clock, which measures how long the clinician
-   took to decide on a grade **after the AI results appeared**. It uses the stopwatch, so paused time
-   is excluded; re-running the AI before submitting restarts the clock.
+1. **Submit Gartland grade** — the reader picks a Gartland grade and submits it.
+   This records two timings from the stopwatch (paused time excluded):
+   `grade_time_seconds`, the time from **X-ray upload (case load) to this
+   submission**, and `decision_time_seconds`, the slice of that **after the AI
+   results appeared** (re-running the AI before submitting restarts the decision
+   clock).
 2. **Submit assessment** — the reader then rates confidence (1–5) and answers
    the follow-up questions (currently an optional comments box), and submits.
    This saves the case.
@@ -84,7 +86,7 @@ a remote laptop. Grades use the AI label space (`Normal`, `Grade 1`,
 Each line is a JSON object, e.g.:
 
 ```json
-{"reviewer":"TT","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"ai_processing_time_seconds":7.3,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
+{"reviewer":"TT","case_id":"a145","ap_path":"/demo/grade-2a/a145-ap.png","lat_path":"/demo/grade-2a/a145-lat.png","input_mode":"demo","pre_grade":"Grade 2a","pre_confidence":3,"post_grade":"Grade 2b","post_confidence":4,"ai_gartland_grade":"Grade 2b","ai_cnn_grade":"Grade 2b","ai_geometric_grade":"Grade 2b","ai_confidence":0.81,"ai_processing_time_seconds":7.3,"notes":null,"decision_started_at":"…","grade_submitted_at":"…","grade_time_seconds":41.7,"decision_time_seconds":12.4,"elapsed_seconds":63.2,"elapsed_hms":"00:01:03","started_at":"…","ended_at":"…","logged_at":"…"}
 ```
 
 `ai_gartland_grade` is the pipeline's final Gartland grade; `ai_cnn_grade` and
@@ -105,7 +107,7 @@ The backend's `logs/predictions.log` (one line per AI run) uses the same
 |---|---|
 | `?limit=N` | N most recent records as JSON (shown under "Recently logged") |
 | `?format=csv` | Every record as a CSV download |
-| `?summary=1` | Grouped timing stats (count, mean/median/min/max/total seconds, mean/median decision time) as JSON |
+| `?summary=1` | Grouped timing stats (count, mean/median/min/max/total seconds, mean/median grade time, mean/median decision time) as JSON |
 | `?summary=1&format=csv` | The same grouped stats as a CSV download |
 | `&group_by=…` | Grouping field for the summary — `reviewer` (default), `pre_grade`, `post_grade`, or `input_mode` |
 

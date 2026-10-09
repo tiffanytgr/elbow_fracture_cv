@@ -37,6 +37,7 @@ interface StudyPayload {
   ai_processing_time_seconds?: number | null;
   notes?: string | null;
   decision_time_seconds?: number | null;
+  grade_time_seconds?: number | null;
   decision_started_at?: string | null;
   grade_submitted_at?: string | null;
   started_at?: string | null;
@@ -106,6 +107,7 @@ const RAW_COLUMNS = [
   "ai_processing_time_seconds",
   "decision_started_at",
   "grade_submitted_at",
+  "grade_time_seconds",
   "decision_time_seconds",
   "elapsed_seconds",
   "elapsed_hms",
@@ -137,6 +139,8 @@ interface GroupStats {
   total_seconds: number;
   mean_decision_seconds: number | null;
   median_decision_seconds: number | null;
+  mean_grade_seconds: number | null;
+  median_grade_seconds: number | null;
 }
 
 function median(sorted: number[]): number {
@@ -149,12 +153,15 @@ function statsFor(
   group: string,
   seconds: number[],
   decisionSeconds: number[],
+  gradeSeconds: number[],
 ): GroupStats {
   const sorted = [...seconds].sort((a, b) => a - b);
   const n = sorted.length;
   const total = sorted.reduce((a, b) => a + b, 0);
   const decisions = [...decisionSeconds].sort((a, b) => a - b);
   const nd = decisions.length;
+  const grades = [...gradeSeconds].sort((a, b) => a - b);
+  const ng = grades.length;
   const round1 = (x: number) => Math.round(x * 10) / 10;
   return {
     group,
@@ -168,6 +175,10 @@ function statsFor(
       ? round1(decisions.reduce((a, b) => a + b, 0) / nd)
       : null,
     median_decision_seconds: nd ? round1(median(decisions)) : null,
+    mean_grade_seconds: ng
+      ? round1(grades.reduce((a, b) => a + b, 0) / ng)
+      : null,
+    median_grade_seconds: ng ? round1(median(grades)) : null,
   };
 }
 
@@ -176,12 +187,20 @@ function summarize(entries: Entry[], groupBy: string): GroupStats[] {
     typeof e.elapsed_seconds === "number" ? e.elapsed_seconds : NaN;
   const timed = entries.filter((e) => isFinite(secondsOf(e)));
 
-  const decisionsOf = (list: Entry[]) =>
+  const finiteField = (list: Entry[], field: string) =>
     list
-      .map((e) => e.decision_time_seconds)
+      .map((e) => e[field])
       .filter((v): v is number => typeof v === "number" && isFinite(v));
+  const decisionsOf = (list: Entry[]) =>
+    finiteField(list, "decision_time_seconds");
+  const gradesOf = (list: Entry[]) => finiteField(list, "grade_time_seconds");
 
-  const overall = statsFor("ALL", timed.map(secondsOf), decisionsOf(timed));
+  const overall = statsFor(
+    "ALL",
+    timed.map(secondsOf),
+    decisionsOf(timed),
+    gradesOf(timed),
+  );
 
   const buckets = new Map<string, Entry[]>();
   for (const e of timed) {
@@ -190,7 +209,9 @@ function summarize(entries: Entry[], groupBy: string): GroupStats[] {
     buckets.get(key)!.push(e);
   }
   const groups = Array.from(buckets.entries())
-    .map(([key, list]) => statsFor(key, list.map(secondsOf), decisionsOf(list)))
+    .map(([key, list]) =>
+      statsFor(key, list.map(secondsOf), decisionsOf(list), gradesOf(list)),
+    )
     .sort((a, b) => a.group.localeCompare(b.group));
 
   return [overall, ...groups];
@@ -204,6 +225,8 @@ const SUMMARY_COLUMNS: (keyof GroupStats)[] = [
   "min_seconds",
   "max_seconds",
   "total_seconds",
+  "mean_grade_seconds",
+  "median_grade_seconds",
   "mean_decision_seconds",
   "median_decision_seconds",
 ];
@@ -256,7 +279,9 @@ export async function POST(req: NextRequest) {
 
     const num = (v: number | null | undefined) =>
       typeof v === "number" && isFinite(v) ? v : null;
+    const round3 = (v: number) => Math.round(Math.max(0, v) * 1000) / 1000;
     const decisionSeconds = num(body.decision_time_seconds);
+    const gradeSeconds = num(body.grade_time_seconds);
 
     const entry = {
       reviewer: body.reviewer?.trim() || null,
@@ -276,10 +301,10 @@ export async function POST(req: NextRequest) {
       notes: body.notes?.trim() || null,
       decision_started_at: body.decision_started_at ?? null,
       grade_submitted_at: body.grade_submitted_at ?? null,
+      // Time from X-ray upload (case load) to Gartland grade submission.
+      grade_time_seconds: gradeSeconds === null ? null : round3(gradeSeconds),
       decision_time_seconds:
-        decisionSeconds === null
-          ? null
-          : Math.round(Math.max(0, decisionSeconds) * 1000) / 1000,
+        decisionSeconds === null ? null : round3(decisionSeconds),
       elapsed_seconds: Math.round(elapsedSeconds * 1000) / 1000,
       elapsed_hms: secondsToHms(elapsedSeconds),
       started_at: body.started_at ?? null,

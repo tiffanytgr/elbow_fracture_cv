@@ -26,6 +26,7 @@ interface RecentEntry {
   case_id: string | null;
   pre_grade: string | null;
   post_grade: string | null;
+  grade_time_seconds: number | null;
   decision_time_seconds: number | null;
   elapsed_hms: string;
   logged_at: string;
@@ -39,6 +40,8 @@ interface SummaryRow {
   total_seconds: number;
   mean_decision_seconds: number | null;
   median_decision_seconds: number | null;
+  mean_grade_seconds: number | null;
+  median_grade_seconds: number | null;
 }
 
 interface StudyPanelProps {
@@ -113,6 +116,8 @@ export function StudyPanel({
   // clock; (2) confidence + follow-up questions, which saves the case.
   const [gradeSubmitted, setGradeSubmitted] = useState(false);
   const [decisionSeconds, setDecisionSeconds] = useState<number | null>(null);
+  // Time from X-ray upload (case load) to Gartland grade submission.
+  const [gradeSeconds, setGradeSeconds] = useState<number | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -201,6 +206,7 @@ export function StudyPanel({
     setComments("");
     setGradeSubmitted(false);
     setDecisionSeconds(null);
+    setGradeSeconds(null);
     setSavedAt(null);
     setSaveError(null);
   }, [caseKey]);
@@ -246,12 +252,18 @@ export function StudyPanel({
     setRunning(true);
   }
 
-  /** Submit 1: lock the decision grade and record the decision time. */
+  /**
+   * Submit 1: lock the decision grade and record timings. `gradeSeconds` is
+   * the stopwatch reading — the time from X-ray upload (case load) to this
+   * submission; `decisionSeconds` is the slice of that since the AI appeared.
+   */
   function submitGrade() {
     if (!canSubmitGrade || decisionStartMsRef.current === null) return;
-    const seconds = (currentElapsedMs() - decisionStartMsRef.current) / 1000;
+    const nowMs = currentElapsedMs();
+    const decision = (nowMs - decisionStartMsRef.current) / 1000;
     gradeSubmittedAtRef.current = new Date().toISOString();
-    setDecisionSeconds(Math.max(0, seconds));
+    setDecisionSeconds(Math.max(0, decision));
+    setGradeSeconds(Math.max(0, nowMs / 1000));
     setGradeSubmitted(true);
   }
 
@@ -290,6 +302,7 @@ export function StudyPanel({
           ai_confidence: aiConfidence,
           ai_processing_time_seconds: aiProcessingSeconds,
           notes: comments,
+          grade_time_seconds: gradeSeconds,
           decision_time_seconds: decisionSeconds,
           decision_started_at: decisionStartedAtRef.current,
           grade_submitted_at: gradeSubmittedAtRef.current,
@@ -469,8 +482,10 @@ export function StudyPanel({
                   <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
                     <Check className="h-3 w-3" />
                     Submitted
+                    {gradeSeconds !== null &&
+                      ` · ${formatSeconds(gradeSeconds)} from upload`}
                     {decisionSeconds !== null &&
-                      ` · decision time ${formatSeconds(decisionSeconds)}`}
+                      ` · ${formatSeconds(decisionSeconds)} after AI`}
                   </span>
                 )}
               </div>
@@ -495,10 +510,10 @@ export function StudyPanel({
                         className="gap-1.5 bg-gradient-to-r from-[#1e3a5f] to-[#2563a8] hover:from-[#1e3a5f]/90 hover:to-[#2563a8]/90"
                       >
                         <Send className="h-4 w-4" />
-                        Submit grade
+                        Submit Gartland grade
                       </Button>
                       <span className="text-xs text-slate-500">
-                        Decision time runs from when the AI results appear until you submit your grade.
+                        Records the time from X-ray upload to this submission; then rate your confidence.
                       </span>
                     </div>
                   )}
@@ -619,6 +634,8 @@ export function StudyPanel({
                     <th className="px-3 py-2 text-right font-semibold">Mean</th>
                     <th className="px-3 py-2 text-right font-semibold">Median</th>
                     <th className="px-3 py-2 text-right font-semibold">Total</th>
+                    <th className="px-3 py-2 text-right font-semibold">Mean grade time</th>
+                    <th className="px-3 py-2 text-right font-semibold">Median grade time</th>
                     <th className="px-3 py-2 text-right font-semibold">Mean decision</th>
                     <th className="px-3 py-2 text-right font-semibold">Median decision</th>
                   </tr>
@@ -648,6 +665,16 @@ export function StudyPanel({
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {formatSeconds(row.total_seconds)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {row.mean_grade_seconds !== null
+                            ? formatSeconds(row.mean_grade_seconds)
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {row.median_grade_seconds !== null
+                            ? formatSeconds(row.median_grade_seconds)
+                            : "—"}
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {row.mean_decision_seconds !== null
@@ -684,6 +711,9 @@ export function StudyPanel({
                   · {entry.case_id ?? "—"}
                   {entry.pre_grade ? ` · pre ${entry.pre_grade}` : ""}
                   {entry.post_grade ? ` → post ${entry.post_grade}` : ""}
+                  {typeof entry.grade_time_seconds === "number"
+                    ? ` · grade in ${formatSeconds(entry.grade_time_seconds)}`
+                    : ""}
                   {typeof entry.decision_time_seconds === "number"
                     ? ` · decision ${formatSeconds(entry.decision_time_seconds)}`
                     : ""}
