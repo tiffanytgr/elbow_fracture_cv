@@ -26,6 +26,8 @@ interface StudyPayload {
   ap_path?: string | null;
   lat_path?: string | null;
   input_mode?: string | null;
+  /** "ai" for the AI-assisted flow, "control" for the no-AI control arm. */
+  arm?: string | null;
   pre_grade?: string | null;
   pre_confidence?: number | null;
   post_grade?: string | null;
@@ -37,6 +39,8 @@ interface StudyPayload {
   ai_processing_time_seconds?: number | null;
   notes?: string | null;
   decision_time_seconds?: number | null;
+  grade_time_seconds?: number | null;
+  pre_grade_time_seconds?: number | null;
   decision_started_at?: string | null;
   grade_submitted_at?: string | null;
   started_at?: string | null;
@@ -95,8 +99,10 @@ const RAW_COLUMNS = [
   "ap_path",
   "lat_path",
   "input_mode",
+  "arm",
   "pre_grade",
   "pre_confidence",
+  "pre_grade_time_seconds",
   "post_grade",
   "post_confidence",
   "ai_gartland_grade",
@@ -106,6 +112,7 @@ const RAW_COLUMNS = [
   "ai_processing_time_seconds",
   "decision_started_at",
   "grade_submitted_at",
+  "grade_time_seconds",
   "decision_time_seconds",
   "elapsed_seconds",
   "elapsed_hms",
@@ -135,8 +142,12 @@ interface GroupStats {
   min_seconds: number;
   max_seconds: number;
   total_seconds: number;
+  mean_pre_grade_seconds: number | null;
+  median_pre_grade_seconds: number | null;
   mean_decision_seconds: number | null;
   median_decision_seconds: number | null;
+  mean_grade_seconds: number | null;
+  median_grade_seconds: number | null;
 }
 
 function median(sorted: number[]): number {
@@ -149,13 +160,19 @@ function statsFor(
   group: string,
   seconds: number[],
   decisionSeconds: number[],
+  gradeSeconds: number[],
+  preGradeSeconds: number[],
 ): GroupStats {
   const sorted = [...seconds].sort((a, b) => a - b);
   const n = sorted.length;
   const total = sorted.reduce((a, b) => a + b, 0);
-  const decisions = [...decisionSeconds].sort((a, b) => a - b);
-  const nd = decisions.length;
   const round1 = (x: number) => Math.round(x * 10) / 10;
+  const meanOf = (xs: number[]) =>
+    xs.length ? round1(xs.reduce((a, b) => a + b, 0) / xs.length) : null;
+  const medianOf = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return s.length ? round1(median(s)) : null;
+  };
   return {
     group,
     count: n,
@@ -164,10 +181,12 @@ function statsFor(
     min_seconds: n ? round1(sorted[0]) : 0,
     max_seconds: n ? round1(sorted[n - 1]) : 0,
     total_seconds: round1(total),
-    mean_decision_seconds: nd
-      ? round1(decisions.reduce((a, b) => a + b, 0) / nd)
-      : null,
-    median_decision_seconds: nd ? round1(median(decisions)) : null,
+    mean_pre_grade_seconds: meanOf(preGradeSeconds),
+    median_pre_grade_seconds: medianOf(preGradeSeconds),
+    mean_decision_seconds: meanOf(decisionSeconds),
+    median_decision_seconds: medianOf(decisionSeconds),
+    mean_grade_seconds: meanOf(gradeSeconds),
+    median_grade_seconds: medianOf(gradeSeconds),
   };
 }
 
@@ -176,12 +195,23 @@ function summarize(entries: Entry[], groupBy: string): GroupStats[] {
     typeof e.elapsed_seconds === "number" ? e.elapsed_seconds : NaN;
   const timed = entries.filter((e) => isFinite(secondsOf(e)));
 
-  const decisionsOf = (list: Entry[]) =>
+  const finiteField = (list: Entry[], field: string) =>
     list
-      .map((e) => e.decision_time_seconds)
+      .map((e) => e[field])
       .filter((v): v is number => typeof v === "number" && isFinite(v));
+  const decisionsOf = (list: Entry[]) =>
+    finiteField(list, "decision_time_seconds");
+  const gradesOf = (list: Entry[]) => finiteField(list, "grade_time_seconds");
+  const preGradesOf = (list: Entry[]) =>
+    finiteField(list, "pre_grade_time_seconds");
 
-  const overall = statsFor("ALL", timed.map(secondsOf), decisionsOf(timed));
+  const overall = statsFor(
+    "ALL",
+    timed.map(secondsOf),
+    decisionsOf(timed),
+    gradesOf(timed),
+    preGradesOf(timed),
+  );
 
   const buckets = new Map<string, Entry[]>();
   for (const e of timed) {
@@ -190,7 +220,15 @@ function summarize(entries: Entry[], groupBy: string): GroupStats[] {
     buckets.get(key)!.push(e);
   }
   const groups = Array.from(buckets.entries())
-    .map(([key, list]) => statsFor(key, list.map(secondsOf), decisionsOf(list)))
+    .map(([key, list]) =>
+      statsFor(
+        key,
+        list.map(secondsOf),
+        decisionsOf(list),
+        gradesOf(list),
+        preGradesOf(list),
+      ),
+    )
     .sort((a, b) => a.group.localeCompare(b.group));
 
   return [overall, ...groups];
@@ -204,6 +242,10 @@ const SUMMARY_COLUMNS: (keyof GroupStats)[] = [
   "min_seconds",
   "max_seconds",
   "total_seconds",
+  "mean_pre_grade_seconds",
+  "median_pre_grade_seconds",
+  "mean_grade_seconds",
+  "median_grade_seconds",
   "mean_decision_seconds",
   "median_decision_seconds",
 ];
@@ -247,16 +289,28 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (!body.pre_grade || !body.post_grade) {
+    const arm = body.arm === "control" ? "control" : "ai";
+    if (!body.pre_grade) {
       return NextResponse.json(
-        { error: "pre_grade and post_grade are required" },
+        { error: "pre_grade is required" },
+        { status: 400 },
+      );
+    }
+    // The AI-assisted arm must carry the post-AI decision grade; the control
+    // arm records only the pre-AI read, so post_grade may be absent.
+    if (arm !== "control" && !body.post_grade) {
+      return NextResponse.json(
+        { error: "post_grade is required for AI-assisted records" },
         { status: 400 },
       );
     }
 
     const num = (v: number | null | undefined) =>
       typeof v === "number" && isFinite(v) ? v : null;
+    const round3 = (v: number) => Math.round(Math.max(0, v) * 1000) / 1000;
     const decisionSeconds = num(body.decision_time_seconds);
+    const gradeSeconds = num(body.grade_time_seconds);
+    const preGradeSeconds = num(body.pre_grade_time_seconds);
 
     const entry = {
       reviewer: body.reviewer?.trim() || null,
@@ -264,8 +318,12 @@ export async function POST(req: NextRequest) {
       ap_path: body.ap_path ?? null,
       lat_path: body.lat_path ?? null,
       input_mode: body.input_mode ?? null,
+      arm,
       pre_grade: body.pre_grade,
       pre_confidence: num(body.pre_confidence),
+      // Control arm: time from X-ray shown to pre-AI grade submission.
+      pre_grade_time_seconds:
+        preGradeSeconds === null ? null : round3(preGradeSeconds),
       post_grade: body.post_grade,
       post_confidence: num(body.post_confidence),
       ai_gartland_grade: body.ai_gartland_grade ?? null,
@@ -276,10 +334,10 @@ export async function POST(req: NextRequest) {
       notes: body.notes?.trim() || null,
       decision_started_at: body.decision_started_at ?? null,
       grade_submitted_at: body.grade_submitted_at ?? null,
+      // Time from X-ray upload (case load) to Gartland grade submission.
+      grade_time_seconds: gradeSeconds === null ? null : round3(gradeSeconds),
       decision_time_seconds:
-        decisionSeconds === null
-          ? null
-          : Math.round(Math.max(0, decisionSeconds) * 1000) / 1000,
+        decisionSeconds === null ? null : round3(decisionSeconds),
       elapsed_seconds: Math.round(elapsedSeconds * 1000) / 1000,
       elapsed_hms: secondsToHms(elapsedSeconds),
       started_at: body.started_at ?? null,
