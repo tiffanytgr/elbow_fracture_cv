@@ -624,7 +624,7 @@ export function StudyPanel({
                     onChange={(e) => setComments(e.target.value)}
                     disabled={alreadySaved}
                     rows={2}
-                    placeholder="Anything notable about this case or the AI output"
+                    placeholder="(Optional) Commentary regarding AI assessment and explanation"
                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </label>
