@@ -521,12 +521,12 @@ export function StudyPanel({
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={!preReady || needsCaseId}
+                    disabled={needsCaseId}
                     onClick={() => setPreLocked(true)}
                     className="gap-1.5"
                   >
                     <Lock className="h-4 w-4" />
-                    Lock &amp; run AI
+                    Run AI
                   </Button>
                   <Button
                     size="sm"
