@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlaskConical,
   Grid2X2,
@@ -265,6 +265,23 @@ export default function HomePage() {
       setLoading(false);
     }
   }
+
+  // Clicking "Run AI" locks the pre-AI read; kick off the analysis
+  // automatically so the reader does not have to press "Analyse X-rays"
+  // separately. Fires once per lock, as soon as the X-rays are ready.
+  const autoRunArmed = useRef(false);
+  useEffect(() => {
+    if (!preLocked) {
+      autoRunArmed.current = false;
+      return;
+    }
+    if (autoRunArmed.current || !canRun || loading || aiRevealed) return;
+    autoRunArmed.current = true;
+    handleRun();
+    // handleRun is intentionally omitted; it is re-created each render but the
+    // guards above ensure a single fresh invocation per lock.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preLocked, canRun, loading, aiRevealed]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] lg:flex">
