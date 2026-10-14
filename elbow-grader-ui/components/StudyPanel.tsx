@@ -394,11 +394,8 @@ export function StudyPanel({
     if (needsCaseId) {
       hint = "Enter a case ID above to start grading.";
     } else if (!preLocked) {
-      hint = !preGradeSubmitted
-        ? "Submit your pre-AI grade, then rate confidence and lock."
-        : !preConf
-          ? "Rate your pre-AI confidence, then lock."
-          : "Lock your pre-AI read to reveal the AI analysis.";
+      hint =
+        "Run the AI analysis, or submit your pre-AI grade and confidence to save as a control case.";
     } else if (!aiRevealed) {
       hint = gradeSubmitted
         ? "AI result is out of date — re-run the analysis to submit."
@@ -540,11 +537,9 @@ export function StudyPanel({
                   </Button>
                 </div>
                 <span className="block text-xs text-slate-500">
-                  {!preGradeSubmitted
-                    ? "Submit your pre-AI grade above to record the control time."
-                    : !preConf
-                      ? "Rate your pre-AI confidence to continue."
-                      : "Lock to reveal the AI analysis, or submit now as a control case (no AI)."}
+                  {!preReady
+                    ? "Run AI to reveal the analysis, or submit your pre-AI grade and confidence above to save as a control case (no AI)."
+                    : "Run AI to reveal the analysis, or submit now as a control case (no AI)."}
                 </span>
               </div>
             )}
